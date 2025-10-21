@@ -1,0 +1,22 @@
+{
+	"dependencies": {
+		"@prisma/client": "^6.17.1",
+		"express": "^5.1.0"
+	},
+	"devDependencies": {
+		"@types/express": "^5.0.3",
+		"@types/node": "^24.8.1",
+		"prisma": "^6.17.1",
+		"ts-node-dev": "^2.0.0",
+		"typescript": "^5.9.3"
+	},
+	"scripts": {
+		"dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+		"build": "tsc -p tsconfig.json",
+		"start": "node dist/server.js",
+		"prisma:format": "prisma format",
+		"prisma:dev": "prisma migrate dev",
+		"prisma:gen": "prisma generate",
+		"prisma:studio": "prisma studio"
+	}
+}
