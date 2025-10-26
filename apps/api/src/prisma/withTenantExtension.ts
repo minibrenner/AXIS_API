@@ -4,7 +4,7 @@ import { TenantContext } from "../tenancy/tenant.context";
 // tipo local de middleware (evita depender de Prisma.Middleware no editor)
 type PrismaMiddleware = (params: any, next: (params: any) => Promise<any>) => Promise<any>;
 
-const MODELS_COM_TENANT = new Set(["User", "Session", "AuditLog"]);
+const MODELS_COM_TENANT = new Set(["User","Session","AuditLog","Supplier","Product"]);
 
 export const withTenantExtension = (): PrismaMiddleware => {
   return async (params, next) => {

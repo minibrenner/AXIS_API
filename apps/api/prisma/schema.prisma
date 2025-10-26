@@ -14,14 +14,20 @@ enum Role {
 }
 
 model Tenant {
-  id        String    @id @default(cuid())
-  name      String
-  cnpj      String?   @unique
-  isActive  Boolean   @default(true)
-  users     User[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  Session   Session[]
+  id         String     @id @default(cuid())
+  name       String
+  cnpj       String?    @unique
+  isActive   Boolean    @default(true)
+  users      User[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  Session    Session[]
+  cpfResLoja String?    @unique
+  email      String     @unique
+  Supplier   Supplier[]
+  Product    Product[]
+
+  categories Category[] // FIX: back-relation obrigatório da relação Category.tenant
 
   @@index([isActive, createdAt])
 }
@@ -79,4 +85,111 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@index([entity, entityId])
+}
+
+model Supplier {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  name      String  @map("nome_fantasia")
+  legalName String  @map("razao_social")
+  cnpj      String  @map("cnpj") @db.VarChar(14)
+  code      Int     @map("codigo_fornecedor")
+  isActive  Boolean @default(true) @map("ativo")
+
+  phone  String? @map("telefone") @db.VarChar(16)
+  mobile String? @map("telefone_celular") @db.VarChar(16)
+  email  String? @db.VarChar(120)
+
+  ie           String? @db.VarChar(20)
+  cep          String? @db.VarChar(8)
+  city         String? @db.VarChar(60)
+  uf           String? @db.VarChar(2)
+  address      String? @db.VarChar(120)
+  addressNo    String? @db.VarChar(10)
+  complement   String? @db.VarChar(60)
+  neighborhood String? @db.VarChar(60)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Product   Product[]
+
+  @@unique([tenantId, cnpj], name: "supplier_cnpj_per_tenant")
+  @@unique([tenantId, code], name: "supplier_code_per_tenant")
+  @@unique([id, tenantId], name: "supplier_id_tenant_unique") // OK: necessário p/ FK composta Product→Supplier
+  @@index([tenantId, name])
+  @@map("fornecedores")
+}
+
+model Product {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Cascade)
+  // ^ Restrict: você PODE deletar Product; bloquear deletar Supplier enquanto houver Products referenciando
+
+  name        String   @map("nome_produto")
+  description String?  @map("descricao") @db.Text
+  sku         String?  @map("sku_interno") @db.VarChar(100)
+  brand       String?  @map("marca_produto") @db.VarChar(30)
+  model       String?  @map("modelo") @db.VarChar(30)
+  unit        String?  @map("unidade_medida") @db.VarChar(5)
+  barcode     String?  @map("codigo_barras") @db.VarChar(100)
+  price       Decimal? @map("valor") @db.Decimal(10, 2)
+  isActive    Boolean  @default(true) @map("ativo")
+
+  ncm        String? @db.VarChar(30)
+  cfop       String? @db.VarChar(20)
+  anvisaCode String? @map("codigo_anvisa") @db.VarChar(20)
+  code       String? @map("codigo_produto") @db.VarChar(30)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  categories ProductCategory[] // FIX: back-relation da pivot N:N ProductCategory
+
+  @@unique([id, tenantId], name: "product_id_tenant_unique") // FIX: necessário p/ FK composta na pivot
+  @@unique([tenantId, sku], map: "product_sku_per_tenant")
+  @@unique([tenantId, code], map: "product_code_per_tenant")
+  @@index([tenantId, name])
+  @@index([tenantId, barcode])
+  @@map("produtos")
+}
+
+model Category {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  name     String
+  isActive Boolean           @default(true)
+  products ProductCategory[] // OK: back-relation da pivot
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name], name: "category_name_per_tenant")
+  @@unique([id, tenantId], name: "category_id_tenant_unique") // OK: útil p/ FKs compostas também
+  @@index([tenantId, name])
+  @@map("categorias")
+}
+
+model ProductCategory {
+  // pivot N:N garantida no MESMO tenant
+  productId  String
+  categoryId String
+  tenantId   String
+
+  product  Product  @relation(fields: [productId, tenantId], references: [id, tenantId], onDelete: Cascade, onUpdate: Cascade)
+  category Category @relation(fields: [categoryId, tenantId], references: [id, tenantId], onDelete: Cascade, onUpdate: Cascade)
+  // FIX: essas references exigem que Product e Category tenham @@unique([id, tenantId]) — corrigido acima
+
+  createdAt DateTime @default(now())
+
+  @@id([productId, categoryId, tenantId]) // uma ligação única por (produto, categoria, tenant)
+  @@index([tenantId])
+  @@map("produto_categorias")
 }
