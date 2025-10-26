@@ -1,46 +1,93 @@
-// apps/api/src/prisma/withTenantExtension.ts
+﻿// apps/api/src/prisma/withTenantExtension.ts
 import { TenantContext } from "../tenancy/tenant.context";
 
-// tipo local de middleware (evita depender de Prisma.Middleware no editor)
-type PrismaMiddleware = (params: any, next: (params: any) => Promise<any>) => Promise<any>;
+export interface PrismaMiddlewareParams {
+  model?: string;
+  action: string;
+  args?: Record<string, unknown>;
+}
 
-const MODELS_COM_TENANT = new Set(["User","Session","AuditLog","Supplier","Product"]);
+export type PrismaMiddlewareNext = (params: PrismaMiddlewareParams) => Promise<unknown>;
+
+export type PrismaMiddleware = (
+  params: PrismaMiddlewareParams,
+  next: PrismaMiddlewareNext
+) => Promise<unknown>;
+
+const MODELS_WITH_TENANT = new Set(["User", "Session", "AuditLog", "Supplier", "Product"]);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const ensureArgs = (params: PrismaMiddlewareParams): Record<string, unknown> => {
+  if (isRecord(params.args)) {
+    return params.args;
+  }
+
+  const args: Record<string, unknown> = {};
+  params.args = args;
+  return args;
+};
+
+const ensureNestedRecord = (
+  root: Record<string, unknown>,
+  key: "where" | "data"
+): Record<string, unknown> => {
+  const existing = root[key];
+
+  if (isRecord(existing)) {
+    return existing;
+  }
+
+  const nested: Record<string, unknown> = {};
+  root[key] = nested;
+  return nested;
+};
+
+const isReadAction = (action: string): boolean =>
+  action.startsWith("find") || action === "count" || action === "aggregate" || action === "groupBy";
+
+const isSingleWriteAction = (action: string): boolean =>
+  action === "create" || action === "update" || action === "upsert";
+
+const isBulkWriteAction = (action: string): boolean =>
+  action === "updateMany" || action === "deleteMany";
 
 export const withTenantExtension = (): PrismaMiddleware => {
   return async (params, next) => {
     const tenantId = TenantContext.get();
 
-    if (tenantId && params.model && MODELS_COM_TENANT.has(params.model)) {
-      // leituras
-      if (
-        params.action?.startsWith?.("find") ||
-        ["count", "aggregate", "groupBy"].includes(params.action)
-      ) {
-        params.args ??= {};
-        params.args.where = { ...(params.args.where ?? {}), tenantId };
-      }
+    if (!tenantId || !params.model || !MODELS_WITH_TENANT.has(params.model)) {
+      return next(params);
+    }
 
-      // escrita single
-      if (["create", "update", "upsert"].includes(params.action)) {
-        params.args ??= {};
-        params.args.data = {
-          ...(params.args.data ?? {}),
-          tenantId: params.args?.data?.tenantId ?? tenantId,
-        };
+    const addTenantToWhere = () => {
+      const args = ensureArgs(params);
+      const where = ensureNestedRecord(args, "where");
+      if (where.tenantId !== tenantId) {
+        where.tenantId = tenantId;
       }
+    };
 
-      // escrita em massa
-      if (["updateMany", "deleteMany"].includes(params.action)) {
-        params.args ??= {};
-        params.args.where = { ...(params.args.where ?? {}), tenantId };
-      }
+    if (isReadAction(params.action)) {
+      addTenantToWhere();
+    }
 
-      // delete single → escopa
-      if (params.action === "delete") {
-        params.action = "deleteMany";
-        params.args ??= {};
-        params.args.where = { ...(params.args.where ?? {}), tenantId };
+    if (isSingleWriteAction(params.action)) {
+      const args = ensureArgs(params);
+      const data = ensureNestedRecord(args, "data");
+      if (data.tenantId === undefined) {
+        data.tenantId = tenantId;
       }
+    }
+
+    if (isBulkWriteAction(params.action)) {
+      addTenantToWhere();
+    }
+
+    if (params.action === "delete") {
+      params.action = "deleteMany";
+      addTenantToWhere();
     }
 
     return next(params);

@@ -1,29 +1,35 @@
-import express from "express";
+﻿import express, { type ErrorRequestHandler } from "express";
 import { tenantMiddleware } from "./tenancy/tenant.middleware";
-// import seu authMiddleware que popula req.user antes do tenantMiddleware
-import { prisma } from "./prisma/client"; // ✅
-
 import routes from "./routes";
+import "./prisma/client";
 
+// porta padrao utilizada pelo servidor HTTP; caso a variavel nao exista, usamos 3000
+const PORT = Number(process.env.PORT) || 3000;
 
+// instancia principal do Express, responsavel por receber e responder requisicoes HTTP
 const app = express();
+
+// middleware que converte payloads JSON em objetos JavaScript acessiveis via req.body
 app.use(express.json());
 
-// 1) auth que decodifica JWT e coloca req.user
-// app.use(authMiddleware);
+// middleware de autenticacao deve vir antes (descomente quando estiver implementado)
+// app.use(authMiddleware); // garante que tenantMiddleware receba o usuario ja autenticado
 
-// 2) tenant: precisa vir depois do auth
+// middleware que injeta o tenant atual no contexto do Prisma antes de chegar nas rotas
 app.use(tenantMiddleware);
 
-// 3) rotas
+// agrupamento das rotas HTTP da aplicacao sob o prefixo /api
 app.use("/api", routes);
 
-// 4) tratador de erros
-app.use((err: any, _req, res, _next) => {
-  console.error(err);
-  res.status(400).json({ error: err.message ?? "Erro" });
-});
+// tratador de erros padrao que traduz excecoes em respostas JSON
+const errorHandler: ErrorRequestHandler = (err, _req, res) => {
+  console.error("Erro nao tratado:", err);
+  res.status(400).json({ error: err instanceof Error ? err.message : "Erro inesperado" });
+};
 
-app.listen(process.env.PORT ?? 3000, () => {
-  console.log("API on", process.env.PORT ?? 3000);
+app.use(errorHandler);
+
+// inicializa o servidor HTTP na porta definida, pronto para receber requisicoes externas
+app.listen(PORT, () => {
+  console.log(`API ativa na porta ${PORT}`);
 });
