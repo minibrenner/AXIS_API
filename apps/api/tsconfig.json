@@ -8,7 +8,8 @@
     "strict": false,
     "skipLibCheck": true,
     "types": ["node", "express"],
+    "typeRoots": ["./src/types", "./node_modules/@types"],
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts", "prisma/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "prisma/**/*.ts"]
 }
