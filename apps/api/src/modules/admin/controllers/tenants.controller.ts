@@ -1,22 +1,18 @@
-import  { type Request, type Response} from "express";
+import { Prisma } from "@prisma/client";
+import { type Request, type Response } from "express";
 import { prisma } from "../../../prisma/client";
 
 /**
- * Controller responsável por lidar com a criação de novos tenants (clientes).
- * Este endpoint NÃO depende do tenantMiddleware, pois é justamente o ponto
- * de entrada para criar o primeiro registro de tenant na plataforma.
+ * Controller responsavel por lidar com operacoes administrativas de tenants.
+ * A criacao de tenants acontece fora do fluxo multi-tenant, portanto estes
+ * handlers nao dependem do tenantMiddleware.
  */
 export const createTenant = async (req: Request, res: Response) => {
   /**
-   * Campos mínimos para criar um tenant. Estes valores chegam via JSON no corpo da requisição.
-   * - name: nome fantasia exibido na plataforma.
-   * - email: usado para contato e também precisa ser único na tabela.
-   * - cnpj: opcional, mas serve para identificar a empresa legalmente.
-   * - cpfResLoja: opcional, caso queira atrelar CPF do responsável.
+   * Campos minimos para criar um tenant. Esses valores chegam via JSON no corpo da requisicao.
    */
   const { name, email, cnpj, cpfResLoja } = req.body ?? {};
 
-  // Validação simples para garantir que os campos obrigatórios existam.
   if (!name || !email) {
     return res
       .status(400)
@@ -24,44 +20,45 @@ export const createTenant = async (req: Request, res: Response) => {
   }
 
   try {
-    /**
-     * Cria o tenant usando o Prisma. O backend já cuida dos campos automáticos:
-     * - id é gerado via cuid().
-     * - createdAt e updatedAt são preenchidos pelo banco.
-     * - isActive inicia como true conforme o schema.
-     */
     const tenant = await prisma.tenant.create({
-      data: {
-        name,
-        email,
-        cnpj,
-        cpfResLoja,
-      },
+      data: { name, email, cnpj, cpfResLoja },
     });
 
-    // Retornamos 201 (Created) junto com o registro completo para o cliente HTTP.
     return res.status(201).json(tenant);
   } catch (error) {
-    /**
-     * Em caso de erro (ex.: e-mail já existe), informamos o cliente com status 500
-     * e uma mensagem genérica. Pro código real, seria interessante mapear erros
-     * conhecidos do Prisma para respostas específicas.
-     */
     console.error("Falha ao criar tenant:", error);
     return res.status(500).json({ error: "Falha ao criar tenant." });
   }
 };
 
+/**
+ * Converte o identificador recebido em rota (id ou cnpj) para o formato aceito
+ * pelo Prisma. CNPJs sao detectados quando contem 14 digitos (ignorando
+ * caracteres especiais). Caso contrario assumimos que se trata do ID (cuid).
+ */
+const resolveTenantUniqueWhere = (identifier: string) => {
+  const digitsOnly = identifier.replace(/\D/g, "");
+  if (digitsOnly.length === 14) {
+    return { cnpj: digitsOnly } as const;
+  }
+
+  return { id: identifier } as const;
+};
+
 export const deleteTenant = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const { identifier } = req.params;
 
   try {
     await prisma.tenant.delete({
-      where: { id },
+      where: resolveTenantUniqueWhere(identifier),
     });
 
     return res.status(204).send();
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return res.status(404).json({ error: "Tenant nao encontrado." });
+    }
+
     console.error("Falha ao deletar tenant:", error);
     return res.status(500).json({ error: "Falha ao deletar tenant." });
   }
@@ -70,18 +67,18 @@ export const deleteTenant = async (req: Request, res: Response) => {
 export const listTenants = async (_req: Request, res: Response) => {
   const tenants = await prisma.tenant.findMany();
   res.json(tenants);
-};  
+};
 
 export const getTenant = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const { identifier } = req.params;
 
   try {
     const tenant = await prisma.tenant.findUnique({
-      where: { id },
+      where: resolveTenantUniqueWhere(identifier),
     });
 
     if (!tenant) {
-      return res.status(404).json({ error: "Tenant não encontrado." });
+      return res.status(404).json({ error: "Tenant nao encontrado." });
     }
 
     return res.json(tenant);
@@ -89,7 +86,7 @@ export const getTenant = async (req: Request, res: Response) => {
     console.error("Falha ao obter tenant:", error);
     return res.status(500).json({ error: "Falha ao obter tenant." });
   }
-};  
+};
 
 export const updateTenant = async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -103,6 +100,10 @@ export const updateTenant = async (req: Request, res: Response) => {
 
     return res.json(tenant);
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return res.status(404).json({ error: "Tenant nao encontrado." });
+    }
+
     console.error("Falha ao atualizar tenant:", error);
     return res.status(500).json({ error: "Falha ao atualizar tenant." });
   }
