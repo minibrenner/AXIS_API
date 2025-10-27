@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createUser, listUsers } from "../controllers/users.controller";
+import { createUser, listUsers, getUser, updateUser, deleteUser } from "../controllers/users.controller";
 
 /**
  * Router especifico para funcionalidades do tenant.
@@ -16,5 +16,12 @@ tenantRouter.post("/users", createUser);
  * GET /api/tenant/users -> lista usuarios do tenant atual em ordem recem-criada.
  */
 tenantRouter.get("/users", listUsers);
+
+tenantRouter.get("/users/:id", getUser);
+
+tenantRouter.put("/users/:id", updateUser);
+
+tenantRouter.delete("/users/:id", deleteUser);
+
 
 export default tenantRouter;

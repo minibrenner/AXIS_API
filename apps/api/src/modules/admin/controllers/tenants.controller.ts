@@ -1,4 +1,4 @@
-import { type Request, type Response } from "express";
+import  { type Request, type Response} from "express";
 import { prisma } from "../../../prisma/client";
 
 /**
@@ -51,3 +51,61 @@ export const createTenant = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Falha ao criar tenant." });
   }
 };
+
+export const deleteTenant = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    await prisma.tenant.delete({
+      where: { id },
+    });
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Falha ao deletar tenant:", error);
+    return res.status(500).json({ error: "Falha ao deletar tenant." });
+  }
+};
+
+export const listTenants = async (_req: Request, res: Response) => {
+  const tenants = await prisma.tenant.findMany();
+  res.json(tenants);
+};  
+
+export const getTenant = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id },
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant não encontrado." });
+    }
+
+    return res.json(tenant);
+  } catch (error) {
+    console.error("Falha ao obter tenant:", error);
+    return res.status(500).json({ error: "Falha ao obter tenant." });
+  }
+};  
+
+export const updateTenant = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name, email, cnpj, cpfResLoja, isActive } = req.body;
+
+  try {
+    const tenant = await prisma.tenant.update({
+      where: { id },
+      data: { name, email, cnpj, cpfResLoja, isActive },
+    });
+
+    return res.json(tenant);
+  } catch (error) {
+    console.error("Falha ao atualizar tenant:", error);
+    return res.status(500).json({ error: "Falha ao atualizar tenant." });
+  }
+};
+
+export default { createTenant, deleteTenant, listTenants, getTenant, updateTenant };
