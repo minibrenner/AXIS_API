@@ -1,77 +1,179 @@
+import { Prisma } from "@prisma/client";
 import { type Request, type Response } from "express";
+import bcrypt from "bcryptjs";
 import { prisma } from "../../../prisma/client";
 
-/**
- * Cria um novo usuario associado ao tenant presente no contexto.
- */
+// ------------ helpers de erro tipado ------------
+function isPrismaKnownError(e: unknown): e is Prisma.PrismaClientKnownRequestError {
+  return e instanceof Prisma.PrismaClientKnownRequestError;
+}
+function toLog(e: unknown) {
+  const out: Record<string, unknown> = {};
+  if (e instanceof Error) {
+    out.name = e.name;
+    out.message = e.message;
+    out.stack = e.stack;
+  }
+  if (typeof e === "object" && e !== null) {
+    const r = e as Record<string, unknown>;
+    if (r.code) out.code = r.code;
+    if (r.meta) out.meta = r.meta;
+  }
+  return out;
+}
+
+// ------------ helpers de resposta sem passwordHash ------------
+const userSelectSafe = {
+  id: true,
+  tenantId: true,
+  email: true,
+  name: true,
+  role: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true
+} satisfies Record<string, boolean>;
+
+// ------------ garantir tenantId ------------
+function requireTenantId(req: Request, res: Response): string | undefined {
+  const tenantId = req.tenantId;
+  if (!tenantId) {
+    res.status(400).json({ error: "Tenant não identificado (tenantId ausente no contexto)." });
+    return undefined;
+  }
+  return tenantId;
+}
+
+// ========== CREATE ==========
 export const createUser = async (req: Request, res: Response) => {
-  const { email, passwordHash, role = "ATTENDANT" } = req.body;
-  // tenantMiddleware garante que `req.tenantId` esteja presente antes de chegar aqui.
-  const tenantId = req.tenantId!;
+  const tenantId = requireTenantId(req, res);
+  if (!tenantId) return;
 
-  const user = await prisma.user.create({
-    data: { tenantId, email, passwordHash, role },
-  });
-
-  res.status(201).json(user);
-};
-
-/**
- * Lista os usuarios pertencentes ao tenant atual, ordenados por criacao.
- */
-export const listUsers = async (_req: Request, res: Response) => {
-  // `prisma.user.findMany` ja aplica o filtro de tenant via withTenantExtension.
-  const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
-  res.json(users);
-};
-
-export const getUser = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const { email, password, name, role, isActive } = req.body;
 
   try {
-    const user = await prisma.user.findFirst({
-      where: { id },
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        tenantId,
+        email,
+        passwordHash,
+        name,
+        role: role ?? "ATTENDANT",
+        isActive: isActive ?? true
+      },
+      select: userSelectSafe
     });
 
-    if (!user) {
-      return res.status(404).json({ error: "Usuario nao encontrado." });
+    return res.status(201).json(user);
+  } catch (error: unknown) {
+    console.error("Falha ao criar usuário [details]:", toLog(error));
+    if (isPrismaKnownError(error)) {
+      if (error.code === "P2002") {
+        return res.status(409).json({
+          error: `Conflito de unicidade no(s) campo(s): ${(error.meta?.target as string[])?.join(", ")}`
+        });
+      }
     }
-
-    return res.json(user);
-  } catch (error) {
-    console.error("Falha ao obter usuario:", error);
-    return res.status(500).json({ error: "Falha ao obter usuario." });
+    return res.status(500).json({ error: "Falha ao criar usuário." });
   }
-};  
+};
 
-export const updateUser = async (req: Request, res: Response) => {
+// ========== LIST ==========
+export const listUsers = async (req: Request, res: Response) => {
+  const tenantId = requireTenantId(req, res);
+  if (!tenantId) return;
+
+  const users = await prisma.user.findMany({
+    where: { tenantId },
+    select: userSelectSafe
+  });
+  return res.json(users);
+};
+
+// ========== GET BY ID ==========
+export const getUser = async (req: Request, res: Response) => {
+  const tenantId = requireTenantId(req, res);
+  if (!tenantId) return;
+
   const { id } = req.params;
-  const { email, passwordHash, role } = req.body;
+
+  const user = await prisma.user.findFirst({
+    where: { id, tenantId },
+    select: userSelectSafe
+  });
+
+  if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
+  return res.json(user);
+};
+
+// ========== UPDATE ==========
+export const updateUser = async (req: Request, res: Response) => {
+  const tenantId = requireTenantId(req, res);
+  if (!tenantId) return;
+
+  const { id } = req.params;
+  const { email, password, name, role, isActive } = req.body;
+
+  const data: Record<string, unknown> = { email, name, role, isActive };
+  if (password) {
+    data.passwordHash = await bcrypt.hash(password, 10);
+  }
 
   try {
     const user = await prisma.user.update({
-      where: { id },
-      data: { email, passwordHash, role },
+      where: { id }, // garantimos escopo pelo filtro seguinte
+      data,
+      select: userSelectSafe
     });
 
+    // proteção extra: valida se pertence ao tenant (em caso de IDs vazados)
+    if (user.tenantId !== tenantId) {
+      return res.status(403).json({ error: "Usuário não pertence a este tenant." });
+    }
+
     return res.json(user);
-  } catch (error) {
-    console.error("Falha ao atualizar usuario:", error);  
-    return res.status(500).json({ error: "Falha ao atualizar usuario." });
+  } catch (error: unknown) {
+    console.error("Falha ao atualizar usuário [details]:", toLog(error));
+    if (isPrismaKnownError(error)) {
+      if (error.code === "P2025") return res.status(404).json({ error: "Usuário não encontrado." });
+      if (error.code === "P2002") {
+        return res.status(409).json({
+          error: `Conflito de unicidade no(s) campo(s): ${(error.meta?.target as string[])?.join(", ")}`
+        });
+      }
+    }
+    return res.status(500).json({ error: "Falha ao atualizar usuário." });
   }
 };
+
+// ========== DELETE ==========
 export const deleteUser = async (req: Request, res: Response) => {
+  const tenantId = requireTenantId(req, res);
+  if (!tenantId) return;
+
   const { id } = req.params;
 
   try {
-    await prisma.user.delete({
+    // delete direto por id e conferência: se quiser, faça first -> check -> delete.
+    const deleted = await prisma.user.delete({
       where: { id },
+      select: { id: true, tenantId: true }
     });
 
+    if (deleted.tenantId !== tenantId) {
+      return res.status(403).json({ error: "Usuário não pertence a este tenant." });
+    }
+
     return res.status(204).send();
-  } catch (error) {
-    console.error("Falha ao deletar usuario:", error);
-    return res.status(500).json({ error: "Falha ao deletar usuario." });
+  } catch (error: unknown) {
+    console.error("Falha ao deletar usuário [details]:", toLog(error));
+    if (isPrismaKnownError(error) && error.code === "P2025") {
+      return res.status(404).json({ error: "Usuário não encontrado." });
+    }
+    return res.status(500).json({ error: "Falha ao deletar usuário." });
   }
 };
 
+export default { createUser, listUsers, getUser, updateUser, deleteUser };

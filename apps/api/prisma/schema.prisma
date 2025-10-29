@@ -14,18 +14,20 @@ enum Role {
 }
 
 model Tenant {
-  id         String     @id @default(cuid())
-  name       String
-  cnpj       String?    @unique
-  isActive   Boolean    @default(true)
-  users      User[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  Session    Session[]
-  cpfResLoja String?    @unique
-  email      String     @unique
-  Supplier   Supplier[]
-  Product    Product[]
+  id                 String     @id @default(cuid())
+  name               String     @unique
+  cnpj               String?    @unique
+  isActive           Boolean    @default(true)
+  users              User[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  Session            Session[]
+  cpfResLoja         String?    @unique
+  email              String     @unique
+  Supplier           Supplier[]
+  Product            Product[]
+  passwordHash       String
+  mustChangePassword Boolean    @default(true) // força troca no 1º login
 
   categories Category[] // FIX: back-relation obrigatório da relação Category.tenant
 
@@ -34,6 +36,8 @@ model Tenant {
 
 model User {
   id            String    @id @default(cuid())
+  name          String?
+  cpf           String?   @unique
   tenantId      String
   tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   email         String

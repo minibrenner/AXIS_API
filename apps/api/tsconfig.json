@@ -4,12 +4,15 @@
     "module": "CommonJS",
     "moduleResolution": "Node",
     "lib": ["ES2022"],
+    "rootDir": "src",
+    "outDir": "dist",
     "esModuleInterop": true,
-    "strict": false,
+    "strict": true,
     "skipLibCheck": true,
     "types": ["node", "express"],
     "typeRoots": ["./src/types", "./node_modules/@types"],
-    "outDir": "dist"
+    "sourceMap": true
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "prisma/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts"],
+  "exclude": ["node_modules", "dist", "prisma/**"]
 }

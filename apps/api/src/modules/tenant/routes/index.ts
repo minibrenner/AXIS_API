@@ -1,27 +1,22 @@
 import { Router } from "express";
-import { createUser, listUsers, getUser, updateUser, deleteUser } from "../controllers/users.controller";
+import {
+  createUser,
+  deleteUser,
+  getUser,
+  listUsers,
+  updateUser
+} from "../controllers/users.controller";
 
-/**
- * Router especifico para funcionalidades do tenant.
- * Aqui ficam apenas declaracoes de rotas; a logica vive nos controllers.
- */
+import { validateBody } from "../../../middlewares/validateBody";
+import { createUserSchema, updateUserSchema } from "../validators/user.schemas";
+
 const tenantRouter = Router();
 
-/**
- * POST /api/tenant/users -> cria um novo usuario vinculado ao tenant atual.
- */
-tenantRouter.post("/users", createUser);
-
-/**
- * GET /api/tenant/users -> lista usuarios do tenant atual em ordem recem-criada.
- */
+/** Users **/
+tenantRouter.post("/users", validateBody(createUserSchema), createUser);
 tenantRouter.get("/users", listUsers);
-
 tenantRouter.get("/users/:id", getUser);
-
-tenantRouter.put("/users/:id", updateUser);
-
+tenantRouter.put("/users/:id", validateBody(updateUserSchema), updateUser);
 tenantRouter.delete("/users/:id", deleteUser);
-
 
 export default tenantRouter;

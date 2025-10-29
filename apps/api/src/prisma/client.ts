@@ -1,18 +1,17 @@
-﻿// apps/api/src/prisma/client.ts
+// apps/api/src/prisma/client.ts
+import path from "node:path";
+import { config } from "dotenv";
 import { PrismaClient } from "@prisma/client";
-import { withTenantExtension, type PrismaMiddleware } from "./withTenantExtension";
+import { withTenantExtension } from "./withTenantExtension";
+
+// carrega variaveis do apps/.env antes de inicializar o Prisma
+config({ path: path.resolve(__dirname, "../../../.env") });
 
 // cliente compartilhado do Prisma, responsavel por abrir conexoes com o banco de dados
-export const prisma = new PrismaClient({
+const basePrisma = new PrismaClient({
   // registra logs detalhados somente em desenvolvimento para facilitar o debug das queries
   log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
 });
 
-// extensao do tipo PrismaClient para habilitar o registro de middlewares customizados
-type PrismaClientComMiddleware = PrismaClient & {
-  $use: (middleware: PrismaMiddleware) => void;
-};
-
 // instancia tipada que acopla o middleware multi-tenant ao ciclo de vida das queries
-const prismaComTenant = prisma as PrismaClientComMiddleware;
-prismaComTenant.$use(withTenantExtension());
+export const prisma = basePrisma.$extends(withTenantExtension());
