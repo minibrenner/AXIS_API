@@ -5,6 +5,7 @@ import { prisma } from "../prisma/client";
 import { validateUser, issueTokens, revokeAllUserSessions } from "./auth.service";
 import { verifyRefresh } from "./jwt";
 import { jwtAuth } from "./middleware";
+import { ErrorCodes, respondWithError } from "../utils/httpErrors";
 
 export const authRouter = Router();
 
@@ -13,12 +14,29 @@ export const authRouter = Router();
  * Body: { email, password }
  */
 authRouter.post("/login", async (req, res) => {
-  const { email, password } = req.body as { email: string; password: string };
+  const { email, password } = (req.body ?? {}) as { email?: string; password?: string };
 
-  if (!email || !password) return res.status(400).json({ error: "email e password são obrigatórios" });
+  const missing: string[] = [];
+  if (!email) missing.push("email");
+  if (!password) missing.push("password");
 
-  const user = await validateUser(email, password);
-  if (!user) return res.status(401).json({ error: "Credenciais inválidas" });
+  if (missing.length) {
+    return respondWithError(res, {
+      status: 400,
+      code: ErrorCodes.BAD_REQUEST,
+      message: "Campos email e password sao obrigatorios.",
+      details: { missing },
+    });
+  }
+
+  const user = await validateUser(email!, password!);
+  if (!user) {
+    return respondWithError(res, {
+      status: 401,
+      code: ErrorCodes.INVALID_CREDENTIALS,
+      message: "Credenciais invalidas.",
+    });
+  }
 
   const tokens = await issueTokens(
     { id: user.id, tenantId: user.tenantId, role: user.role },
@@ -31,10 +49,10 @@ authRouter.post("/login", async (req, res) => {
 /**
  * GET /auth/me
  * Header: Authorization: Bearer <access>
- * Retorna dados básicos do portador do token.
+ * Retorna dados basicos do portador do token.
  */
 authRouter.get("/me", jwtAuth(false), (req, res) => {
-  // aqui não exigimos tenant match pq é apenas introspecção
+  // aqui nao exigimos tenant match porque e apenas introspeccao
   return res.json(req.user);
 });
 
@@ -44,25 +62,48 @@ authRouter.get("/me", jwtAuth(false), (req, res) => {
  * Valida o refresh (via hash em Session) e emite novo par de tokens.
  */
 authRouter.post("/refresh", async (req, res) => {
-  const { refresh } = req.body as { refresh: string };
-  if (!refresh) return res.status(400).json({ error: "refresh token requerido" });
+  const { refresh } = (req.body ?? {}) as { refresh?: string };
+  if (!refresh) {
+    return respondWithError(res, {
+      status: 400,
+      code: ErrorCodes.BAD_REQUEST,
+      message: "Refresh token requerido.",
+    });
+  }
 
   let payload;
   try {
     payload = verifyRefresh(refresh);
   } catch {
-    return res.status(401).json({ error: "refresh inválido" });
+    return respondWithError(res, {
+      status: 401,
+      code: ErrorCodes.REFRESH_INVALID,
+      message: "Refresh invalido.",
+    });
   }
 
-  // busca todas as sessões do usuário (poderia otimizar com expiresAt > now)
+  // busca todas as sessoes do usuario (poderia otimizar com expiresAt > now)
   const sessions = await prisma.session.findMany({ where: { userId: payload.sub } });
-  if (!sessions.length) return res.status(401).json({ error: "refresh não encontrado" });
+  if (!sessions.length) {
+    return respondWithError(res, {
+      status: 401,
+      code: ErrorCodes.SESSION_NOT_FOUND,
+      message: "Refresh nao encontrado.",
+      details: { userId: payload.sub },
+    });
+  }
 
   const ok = await Promise.any(
-    sessions.map((s) => argon2.verify(s.refreshHash, refresh))
+    sessions.map((session) => argon2.verify(session.refreshHash, refresh))
   ).catch(() => false);
 
-  if (!ok) return res.status(401).json({ error: "refresh inválido" });
+  if (!ok) {
+    return respondWithError(res, {
+      status: 401,
+      code: ErrorCodes.REFRESH_INVALID,
+      message: "Refresh invalido.",
+    });
+  }
 
   // emite novos tokens com o mesmo tenant/role do payload
   const tokens = await issueTokens(
@@ -74,10 +115,16 @@ authRouter.post("/refresh", async (req, res) => {
 /**
  * POST /auth/logout
  * Header: Authorization: Bearer <access>
- * Revoga TODAS as sessões do usuário.
+ * Revoga TODAS as sessoes do usuario.
  */
 authRouter.post("/logout", jwtAuth(false), async (req, res) => {
-  if (!req.user) return res.status(401).json({ error: "não autenticado" });
+  if (!req.user) {
+    return respondWithError(res, {
+      status: 401,
+      code: ErrorCodes.UNAUTHENTICATED,
+      message: "Nao autenticado.",
+    });
+  }
   await revokeAllUserSessions(req.user.userId);
   return res.json({ ok: true });
 });

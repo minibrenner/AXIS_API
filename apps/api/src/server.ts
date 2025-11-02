@@ -1,8 +1,9 @@
-﻿import express, { type ErrorRequestHandler } from "express";
+import express, { type ErrorRequestHandler } from "express";
 import { tenantMiddleware } from "./tenancy/tenant.middleware";
 import adminRoutes from "./modules/admin/routes";
 import routes from "./routes";
 import "./prisma/client";
+import { buildErrorBody, normalizeError } from "./utils/httpErrors";
 
 // porta padrao utilizada pelo servidor HTTP; caso a variavel nao exista, usamos 3000
 const PORT = Number(process.env.PORT) || 3000;
@@ -27,9 +28,19 @@ app.use("/api/t/:tenantId", tenantMiddleware);
 app.use("/api", routes);
 
 // tratador de erros padrao que traduz excecoes em respostas JSON
-const errorHandler: ErrorRequestHandler = (err, _req, res) => {
-  console.error("Erro nao tratado:", err);
-  res.status(400).json({ error: err instanceof Error ? err.message : "Erro inesperado" });
+const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
+  const httpError = normalizeError(err);
+
+  console.error("Erro nao tratado:", {
+    method: req.method,
+    path: req.originalUrl ?? req.url,
+    status: httpError.status,
+    code: httpError.code,
+    message: httpError.message,
+    stack: err instanceof Error ? err.stack : undefined,
+  });
+
+  res.status(httpError.status).json(buildErrorBody(httpError));
 };
 
 app.use(errorHandler);

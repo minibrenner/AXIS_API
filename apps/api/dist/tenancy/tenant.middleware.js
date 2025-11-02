@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.tenantMiddleware = tenantMiddleware;
 const tenant_context_1 = require("./tenant.context");
+const httpErrors_1 = require("../utils/httpErrors");
 /**
  * Middleware responsavel por descobrir o tenant atual e salva-lo em:
  * - `req.tenantId`, facilitando o uso nas rotas/controllers.
@@ -20,7 +21,11 @@ function tenantMiddleware(req, _res, next) {
     // Escolhemos o primeiro valor disponivel; se ambos existirem, o do usuario tem prioridade.
     const tenantId = tenantFromUser || tenantFromHeader || tenantFromParams;
     if (!tenantId) {
-        return next(new Error("Tenant nao identificado"));
+        return next(new httpErrors_1.HttpError({
+            status: 400,
+            code: httpErrors_1.ErrorCodes.TENANT_NOT_RESOLVED,
+            message: "Tenant nao identificado.",
+        }));
     }
     // Disponibiliza o tenant no objeto da request para que controllers possam reutilizar.
     req.tenantId = tenantId;

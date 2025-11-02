@@ -1,10 +1,11 @@
-﻿// apps/api/src/modules/tenant/controllers/users.controller.ts
+// apps/api/src/modules/tenant/controllers/users.controller.ts
 // Controlador do CRUD de usuarios por tenant. Cada handler reforca o isolamento entre tenants,
 // usa argon2 para hashing de senha e responde apenas com campos seguros.
 import { Prisma } from "@prisma/client";
 import { type Request, type Response } from "express";
 import argon2 from "argon2";
 import { prisma } from "../../../prisma/client";
+import { ErrorCodes, respondWithError } from "../../../utils/httpErrors";
 import type { CreateUserInput, UpdateUserInput } from "../validators/user.schemas";
 
 /** Campos autorizados a sair na camada HTTP (passwordHash jamais e exposto). */
@@ -55,7 +56,11 @@ function toLog(error: unknown) {
 function requireTenantId(req: Request, res: Response): string | undefined {
   const tenantId = req.tenantId;
   if (!tenantId) {
-    res.status(400).json({ error: "Tenant nao identificado (tenantId ausente no contexto)." });
+    respondWithError(res, {
+      status: 400,
+      code: ErrorCodes.TENANT_NOT_RESOLVED,
+      message: "Tenant nao identificado no contexto da requisicao.",
+    });
     return undefined;
   }
   return tenantId;
@@ -106,9 +111,18 @@ export const createUser = async (req: Request, res: Response) => {
     console.error("Falha ao criar usuario [details]:", toLog(error));
     if (isPrismaKnownError(error) && error.code === "P2002") {
       const target = (error.meta?.target as string[] | undefined)?.join(", ");
-      return res.status(409).json({ error: `Conflito de unicidade nos campos: ${target ?? "dados"}` });
+      return respondWithError(res, {
+        status: 409,
+        code: ErrorCodes.USER_CONFLICT,
+        message: "Ja existe um usuario com os dados fornecidos.",
+        ...(target ? { details: { target } } : {}),
+      });
     }
-    return res.status(500).json({ error: "Falha ao criar usuario." });
+    return respondWithError(res, {
+      status: 500,
+      code: ErrorCodes.INTERNAL,
+      message: "Falha ao criar usuario.",
+    });
   }
 };
 
@@ -142,7 +156,11 @@ export const getUser = async (req: Request, res: Response) => {
   });
 
   if (!user) {
-    return res.status(404).json({ error: "Usuario nao encontrado." });
+    return respondWithError(res, {
+      status: 404,
+      code: ErrorCodes.USER_NOT_FOUND,
+      message: "Usuario nao encontrado.",
+    });
   }
 
   return res.json(user);
@@ -150,7 +168,7 @@ export const getUser = async (req: Request, res: Response) => {
 
 /**
  * PUT /users/:id - atualiza dados do usuario garantindo isolamento multi-tenant.
- * Se uma nova senha vier, o hash e atualizado e passwordUpdatedAt e avançado.
+ * Se uma nova senha vier, o hash e atualizado e passwordUpdatedAt e avancado.
  */
 export const updateUser = async (req: Request, res: Response) => {
   const tenantId = requireTenantId(req, res);
@@ -181,7 +199,11 @@ export const updateUser = async (req: Request, res: Response) => {
     });
 
     if (result.count === 0) {
-      return res.status(404).json({ error: "Usuario nao encontrado." });
+      return respondWithError(res, {
+        status: 404,
+        code: ErrorCodes.USER_NOT_FOUND,
+        message: "Usuario nao encontrado.",
+      });
     }
 
     const updated = await prisma.user.findFirst({
@@ -194,9 +216,18 @@ export const updateUser = async (req: Request, res: Response) => {
     console.error("Falha ao atualizar usuario [details]:", toLog(error));
     if (isPrismaKnownError(error) && error.code === "P2002") {
       const target = (error.meta?.target as string[] | undefined)?.join(", ");
-      return res.status(409).json({ error: `Conflito de unicidade nos campos: ${target ?? "dados"}` });
+      return respondWithError(res, {
+        status: 409,
+        code: ErrorCodes.USER_CONFLICT,
+        message: "Ja existe um usuario com os dados fornecidos.",
+        ...(target ? { details: { target } } : {}),
+      });
     }
-    return res.status(500).json({ error: "Falha ao atualizar usuario." });
+    return respondWithError(res, {
+      status: 500,
+      code: ErrorCodes.INTERNAL,
+      message: "Falha ao atualizar usuario.",
+    });
   }
 };
 
@@ -215,13 +246,21 @@ export const deleteUser = async (req: Request, res: Response) => {
     });
 
     if (result.count === 0) {
-      return res.status(404).json({ error: "Usuario nao encontrado." });
+      return respondWithError(res, {
+        status: 404,
+        code: ErrorCodes.USER_NOT_FOUND,
+        message: "Usuario nao encontrado.",
+      });
     }
 
     return res.status(204).send();
   } catch (error: unknown) {
     console.error("Falha ao deletar usuario [details]:", toLog(error));
-    return res.status(500).json({ error: "Falha ao deletar usuario." });
+    return respondWithError(res, {
+      status: 500,
+      code: ErrorCodes.INTERNAL,
+      message: "Falha ao deletar usuario.",
+    });
   }
 };
 

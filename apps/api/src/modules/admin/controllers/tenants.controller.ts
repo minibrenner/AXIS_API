@@ -1,9 +1,10 @@
-﻿// apps/api/src/modules/admin/controllers/tenants.controller.ts
+// apps/api/src/modules/admin/controllers/tenants.controller.ts
 // CRUD administrativo de tenants com checagens de unicidade e mensagens amigaveis.
 import { Prisma } from "@prisma/client";
 import { type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../../prisma/client";
+import { ErrorCodes, respondWithError } from "../../../utils/httpErrors";
 
 function isPrismaKnownError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
   return error instanceof Prisma.PrismaClientKnownRequestError;
@@ -43,30 +44,73 @@ const resolveTenantUniqueWhere = (identifier: string) => {
 };
 
 export const createTenant = async (req: Request, res: Response) => {
-  const { name, email, cnpj, cpfResLoja } = req.body ?? {};
+  const payload = (req.body ?? {}) as {
+    name?: string;
+    email?: string;
+    cnpj?: string;
+    cpfResLoja?: string;
+  };
+  const { name, email, cnpj, cpfResLoja } = payload;
 
-  if (!name || !email) {
-    return res
-      .status(400)
-      .json({ error: "Informe pelo menos os campos name e email para criar um tenant." });
+  const missingFields: string[] = [];
+  if (!name) missingFields.push("name");
+  if (!email) missingFields.push("email");
+
+  if (missingFields.length) {
+    return respondWithError(res, {
+      status: 400,
+      code: ErrorCodes.BAD_REQUEST,
+      message: "Informe os campos obrigatorios name e email para criar um tenant.",
+      details: { missing: missingFields },
+    });
   }
+
+  const ensuredName = name as string;
+  const ensuredEmail = email as string;
 
   try {
     const [emailExists, cnpjExists, nameExists, cpfExists] = await Promise.all([
-      prisma.tenant.findUnique({ where: { email } }),
+      prisma.tenant.findUnique({ where: { email: ensuredEmail } }),
       cnpj ? prisma.tenant.findUnique({ where: { cnpj } }) : Promise.resolve(null),
-      prisma.tenant.findUnique({ where: { name } }),
+      prisma.tenant.findUnique({ where: { name: ensuredName } }),
       cpfResLoja ? prisma.tenant.findUnique({ where: { cpfResLoja } }) : Promise.resolve(null),
     ]);
 
-    if (emailExists) return res.status(409).json({ error: "Email ja cadastrado." });
-    if (cnpj && cnpjExists) return res.status(409).json({ error: "CNPJ ja cadastrado." });
-    if (nameExists) return res.status(409).json({ error: "Nome ja cadastrado." });
-    if (cpfResLoja && cpfExists)
-      return res.status(409).json({ error: "CPF do responsavel da loja ja cadastrado." });
+    if (emailExists) {
+      return respondWithError(res, {
+        status: 409,
+        code: ErrorCodes.TENANT_CONFLICT,
+        message: "Email ja cadastrado.",
+        details: { field: "email" },
+      });
+    }
+    if (cnpj && cnpjExists) {
+      return respondWithError(res, {
+        status: 409,
+        code: ErrorCodes.TENANT_CONFLICT,
+        message: "CNPJ ja cadastrado.",
+        details: { field: "cnpj" },
+      });
+    }
+    if (nameExists) {
+      return respondWithError(res, {
+        status: 409,
+        code: ErrorCodes.TENANT_CONFLICT,
+        message: "Nome ja cadastrado.",
+        details: { field: "name" },
+      });
+    }
+    if (cpfResLoja && cpfExists) {
+      return respondWithError(res, {
+        status: 409,
+        code: ErrorCodes.TENANT_CONFLICT,
+        message: "CPF do responsavel da loja ja cadastrado.",
+        details: { field: "cpfResLoja" },
+      });
+    }
 
     const tenant = await prisma.tenant.create({
-      data: { name, email, cnpj, cpfResLoja },
+      data: { name: ensuredName, email: ensuredEmail, cnpj, cpfResLoja },
     });
 
     return res.status(201).json(tenant);
@@ -75,10 +119,19 @@ export const createTenant = async (req: Request, res: Response) => {
 
     if (isPrismaKnownError(error) && error.code === "P2002") {
       const target = formatUniqueTarget(error.meta?.target);
-      return res.status(409).json({ error: `Conflito de unicidade nos campos: ${target}` });
+      return respondWithError(res, {
+        status: 409,
+        code: ErrorCodes.TENANT_CONFLICT,
+        message: "Ja existe um tenant com os dados fornecidos.",
+        ...(target ? { details: { target } } : {}),
+      });
     }
 
-    return res.status(500).json({ error: "Falha ao criar tenant por conta do servidor." });
+    return respondWithError(res, {
+      status: 500,
+      code: ErrorCodes.INTERNAL,
+      message: "Falha ao criar tenant por conta do servidor.",
+    });
   }
 };
 
@@ -93,10 +146,19 @@ export const deleteTenant = async (req: Request, res: Response) => {
     return res.status(204).send();
   } catch (error: unknown) {
     if (isPrismaKnownError(error) && error.code === "P2025") {
-      return res.status(404).json({ error: "Tenant nao encontrado." });
+      return respondWithError(res, {
+        status: 404,
+        code: ErrorCodes.TENANT_NOT_FOUND,
+        message: "Tenant nao encontrado.",
+        details: { identifier },
+      });
     }
     console.error("Falha ao deletar tenant:", toLog(error));
-    return res.status(500).json({ error: "Falha ao deletar tenant." });
+    return respondWithError(res, {
+      status: 500,
+      code: ErrorCodes.INTERNAL,
+      message: "Falha ao deletar tenant.",
+    });
   }
 };
 
@@ -114,13 +176,22 @@ export const getTenant = async (req: Request, res: Response) => {
     });
 
     if (!tenant) {
-      return res.status(404).json({ error: "Tenant nao encontrado." });
+      return respondWithError(res, {
+        status: 404,
+        code: ErrorCodes.TENANT_NOT_FOUND,
+        message: "Tenant nao encontrado.",
+        details: { identifier },
+      });
     }
 
     return res.json(tenant);
   } catch (error: unknown) {
     console.error("Falha ao obter tenant:", toLog(error));
-    return res.status(500).json({ error: "Falha ao obter tenant." });
+    return respondWithError(res, {
+      status: 500,
+      code: ErrorCodes.INTERNAL,
+      message: "Falha ao obter tenant.",
+    });
   }
 };
 
@@ -150,16 +221,30 @@ export const updateTenant = async (req: Request, res: Response) => {
   } catch (error: unknown) {
     if (isPrismaKnownError(error)) {
       if (error.code === "P2025") {
-        return res.status(404).json({ error: "Tenant nao encontrado." });
+        return respondWithError(res, {
+          status: 404,
+          code: ErrorCodes.TENANT_NOT_FOUND,
+          message: "Tenant nao encontrado.",
+          details: { identifier },
+        });
       }
       if (error.code === "P2002") {
         const target = formatUniqueTarget(error.meta?.target);
-        return res.status(409).json({ error: `Conflito de unicidade nos campos: ${target}` });
+        return respondWithError(res, {
+          status: 409,
+          code: ErrorCodes.TENANT_CONFLICT,
+          message: "Ja existe um tenant com os dados fornecidos.",
+          ...(target ? { details: { target } } : {}),
+        });
       }
     }
 
     console.error("Falha ao atualizar tenant:", toLog(error));
-    return res.status(500).json({ error: "Falha ao atualizar tenant." });
+    return respondWithError(res, {
+      status: 500,
+      code: ErrorCodes.INTERNAL,
+      message: "Falha ao atualizar tenant.",
+    });
   }
 };
 

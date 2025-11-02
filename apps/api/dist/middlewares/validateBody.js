@@ -1,17 +1,22 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateBody = void 0;
+const httpErrors_1 = require("../utils/httpErrors");
 const validateBody = (schema) => (req, res, next) => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-        const issues = result.error.issues.map((i) => ({
-            path: i.path.join("."),
-            message: i.message,
-            code: i.code,
-        }));
-        return res.status(400).json({ error: "Body inválido", issues });
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 422,
+            code: httpErrors_1.ErrorCodes.VALIDATION,
+            message: "Body invalido",
+            errors: (0, httpErrors_1.toFieldErrors)(result.error.issues.map((issue) => ({
+                path: issue.path,
+                message: issue.message,
+                code: issue.code,
+            }))),
+        });
     }
-    req.body = result.data; // dado já validado/normalizado
+    req.body = result.data; // dado ja validado/normalizado
     next();
 };
 exports.validateBody = validateBody;

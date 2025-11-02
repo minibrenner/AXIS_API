@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { TenantContext } from "./tenant.context";
+import { ErrorCodes, HttpError } from "../utils/httpErrors";
 
 /**
  * Middleware responsavel por descobrir o tenant atual e salva-lo em:
@@ -20,7 +21,13 @@ export function tenantMiddleware(req: Request, _res: Response, next: NextFunctio
   const tenantId = tenantFromUser || tenantFromHeader || tenantFromParams;
 
   if (!tenantId) {
-    return next(new Error("Tenant nao identificado"));
+    return next(
+      new HttpError({
+        status: 400,
+        code: ErrorCodes.TENANT_NOT_RESOLVED,
+        message: "Tenant nao identificado.",
+      })
+    );
   }
 
   // Disponibiliza o tenant no objeto da request para que controllers possam reutilizar.

@@ -9,6 +9,7 @@ exports.updateTenant = exports.getTenant = exports.listTenants = exports.deleteT
 const client_1 = require("@prisma/client");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const client_2 = require("../../../prisma/client");
+const httpErrors_1 = require("../../../utils/httpErrors");
 function isPrismaKnownError(error) {
     return error instanceof client_1.Prisma.PrismaClientKnownRequestError;
 }
@@ -47,29 +48,64 @@ const resolveTenantUniqueWhere = (identifier) => {
     return { id: identifier };
 };
 const createTenant = async (req, res) => {
-    const { name, email, cnpj, cpfResLoja } = req.body ?? {};
-    if (!name || !email) {
-        return res
-            .status(400)
-            .json({ error: "Informe pelo menos os campos name e email para criar um tenant." });
+    const payload = (req.body ?? {});
+    const { name, email, cnpj, cpfResLoja } = payload;
+    const missingFields = [];
+    if (!name)
+        missingFields.push("name");
+    if (!email)
+        missingFields.push("email");
+    if (missingFields.length) {
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 400,
+            code: httpErrors_1.ErrorCodes.BAD_REQUEST,
+            message: "Informe os campos obrigatorios name e email para criar um tenant.",
+            details: { missing: missingFields },
+        });
     }
+    const ensuredName = name;
+    const ensuredEmail = email;
     try {
         const [emailExists, cnpjExists, nameExists, cpfExists] = await Promise.all([
-            client_2.prisma.tenant.findUnique({ where: { email } }),
+            client_2.prisma.tenant.findUnique({ where: { email: ensuredEmail } }),
             cnpj ? client_2.prisma.tenant.findUnique({ where: { cnpj } }) : Promise.resolve(null),
-            client_2.prisma.tenant.findUnique({ where: { name } }),
+            client_2.prisma.tenant.findUnique({ where: { name: ensuredName } }),
             cpfResLoja ? client_2.prisma.tenant.findUnique({ where: { cpfResLoja } }) : Promise.resolve(null),
         ]);
-        if (emailExists)
-            return res.status(409).json({ error: "Email ja cadastrado." });
-        if (cnpj && cnpjExists)
-            return res.status(409).json({ error: "CNPJ ja cadastrado." });
-        if (nameExists)
-            return res.status(409).json({ error: "Nome ja cadastrado." });
-        if (cpfResLoja && cpfExists)
-            return res.status(409).json({ error: "CPF do responsavel da loja ja cadastrado." });
+        if (emailExists) {
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 409,
+                code: httpErrors_1.ErrorCodes.TENANT_CONFLICT,
+                message: "Email ja cadastrado.",
+                details: { field: "email" },
+            });
+        }
+        if (cnpj && cnpjExists) {
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 409,
+                code: httpErrors_1.ErrorCodes.TENANT_CONFLICT,
+                message: "CNPJ ja cadastrado.",
+                details: { field: "cnpj" },
+            });
+        }
+        if (nameExists) {
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 409,
+                code: httpErrors_1.ErrorCodes.TENANT_CONFLICT,
+                message: "Nome ja cadastrado.",
+                details: { field: "name" },
+            });
+        }
+        if (cpfResLoja && cpfExists) {
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 409,
+                code: httpErrors_1.ErrorCodes.TENANT_CONFLICT,
+                message: "CPF do responsavel da loja ja cadastrado.",
+                details: { field: "cpfResLoja" },
+            });
+        }
         const tenant = await client_2.prisma.tenant.create({
-            data: { name, email, cnpj, cpfResLoja },
+            data: { name: ensuredName, email: ensuredEmail, cnpj, cpfResLoja },
         });
         return res.status(201).json(tenant);
     }
@@ -77,9 +113,18 @@ const createTenant = async (req, res) => {
         console.error("Falha ao criar tenant [details]:", toLog(error));
         if (isPrismaKnownError(error) && error.code === "P2002") {
             const target = formatUniqueTarget(error.meta?.target);
-            return res.status(409).json({ error: `Conflito de unicidade nos campos: ${target}` });
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 409,
+                code: httpErrors_1.ErrorCodes.TENANT_CONFLICT,
+                message: "Ja existe um tenant com os dados fornecidos.",
+                ...(target ? { details: { target } } : {}),
+            });
         }
-        return res.status(500).json({ error: "Falha ao criar tenant por conta do servidor." });
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 500,
+            code: httpErrors_1.ErrorCodes.INTERNAL,
+            message: "Falha ao criar tenant por conta do servidor.",
+        });
     }
 };
 exports.createTenant = createTenant;
@@ -93,10 +138,19 @@ const deleteTenant = async (req, res) => {
     }
     catch (error) {
         if (isPrismaKnownError(error) && error.code === "P2025") {
-            return res.status(404).json({ error: "Tenant nao encontrado." });
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 404,
+                code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
+                message: "Tenant nao encontrado.",
+                details: { identifier },
+            });
         }
         console.error("Falha ao deletar tenant:", toLog(error));
-        return res.status(500).json({ error: "Falha ao deletar tenant." });
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 500,
+            code: httpErrors_1.ErrorCodes.INTERNAL,
+            message: "Falha ao deletar tenant.",
+        });
     }
 };
 exports.deleteTenant = deleteTenant;
@@ -112,13 +166,22 @@ const getTenant = async (req, res) => {
             where: resolveTenantUniqueWhere(identifier),
         });
         if (!tenant) {
-            return res.status(404).json({ error: "Tenant nao encontrado." });
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 404,
+                code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
+                message: "Tenant nao encontrado.",
+                details: { identifier },
+            });
         }
         return res.json(tenant);
     }
     catch (error) {
         console.error("Falha ao obter tenant:", toLog(error));
-        return res.status(500).json({ error: "Falha ao obter tenant." });
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 500,
+            code: httpErrors_1.ErrorCodes.INTERNAL,
+            message: "Falha ao obter tenant.",
+        });
     }
 };
 exports.getTenant = getTenant;
@@ -150,15 +213,29 @@ const updateTenant = async (req, res) => {
     catch (error) {
         if (isPrismaKnownError(error)) {
             if (error.code === "P2025") {
-                return res.status(404).json({ error: "Tenant nao encontrado." });
+                return (0, httpErrors_1.respondWithError)(res, {
+                    status: 404,
+                    code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
+                    message: "Tenant nao encontrado.",
+                    details: { identifier },
+                });
             }
             if (error.code === "P2002") {
                 const target = formatUniqueTarget(error.meta?.target);
-                return res.status(409).json({ error: `Conflito de unicidade nos campos: ${target}` });
+                return (0, httpErrors_1.respondWithError)(res, {
+                    status: 409,
+                    code: httpErrors_1.ErrorCodes.TENANT_CONFLICT,
+                    message: "Ja existe um tenant com os dados fornecidos.",
+                    ...(target ? { details: { target } } : {}),
+                });
             }
         }
         console.error("Falha ao atualizar tenant:", toLog(error));
-        return res.status(500).json({ error: "Falha ao atualizar tenant." });
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 500,
+            code: httpErrors_1.ErrorCodes.INTERNAL,
+            message: "Falha ao atualizar tenant.",
+        });
     }
 };
 exports.updateTenant = updateTenant;

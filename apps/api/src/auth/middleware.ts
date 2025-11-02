@@ -1,8 +1,10 @@
-﻿// apps/api/src/auth/middleware.ts
+// apps/api/src/auth/middleware.ts
 // Middleware de autenticacao JWT + guard de RBAC baseado em roles.
 // Valida tokens, injeta dados do usuario na request e bloqueia acesso de roles nao autorizadas.
 import { Request, Response, NextFunction } from "express";
 import { verifyAccess } from "./jwt";
+import { ErrorCodes, respondWithError } from "../utils/httpErrors";
+import { allowRoles } from "../security/rbac";
 
 // Enum textual das roles aceitas pela aplicacao.
 type AuthRole = "ADMIN" | "ATTENDANT" | "OWNER";
@@ -26,14 +28,22 @@ export function jwtAuth(requireTenantMatch = true) {
   return (req: Request, res: Response, next: NextFunction) => {
     const token = getBearer(req); // token bruto vindo do header
     if (!token) {
-      return res.status(401).json({ error: "Token ausente" });
+      return respondWithError(res, {
+        status: 401,
+        code: ErrorCodes.TOKEN_MISSING,
+        message: "Token ausente.",
+      });
     }
 
     try {
       const payload = verifyAccess(token); // decodifica e valida assinatura/expiracao
 
       if (!isAuthRole(payload.role)) {
-        return res.status(403).json({ error: "Role invalida no token" });
+        return respondWithError(res, {
+          status: 403,
+          code: ErrorCodes.FORBIDDEN,
+          message: "Role invalida no token.",
+        });
       }
 
       // Popula o usuario autenticado para uso posterior nas rotas protegidas.
@@ -47,36 +57,34 @@ export function jwtAuth(requireTenantMatch = true) {
       if (requireTenantMatch) {
         // Middleware de tenant deve ter preenchido req.tenantId previamente.
         if (!req.tenantId) {
-          return res.status(400).json({ error: "Tenant nao resolvido no contexto" });
+          return respondWithError(res, {
+            status: 400,
+            code: ErrorCodes.TENANT_NOT_RESOLVED,
+            message: "Tenant nao resolvido no contexto.",
+          });
         }
         // Evita que um token de outro tenant seja aceito na rota atual.
         if (req.tenantId !== payload.tid) {
-          return res.status(403).json({ error: "Tenant do token nao corresponde ao tenant da rota" });
+          return respondWithError(res, {
+            status: 403,
+            code: ErrorCodes.FORBIDDEN,
+            message: "Tenant do token nao corresponde ao tenant da rota.",
+          });
         }
       }
 
       return next(); // requisicao autenticada com sucesso
     } catch {
-      return res.status(401).json({ error: "Token invalido" });
+      return respondWithError(res, {
+        status: 401,
+        code: ErrorCodes.TOKEN_INVALID,
+        message: "Token invalido.",
+      });
     }
   };
 }
 
 // Guard de autorizacao que limita o acesso a determinadas roles.
 export function requireRole(...roles: AuthRole[]) {
-  const allowed = new Set<AuthRole>(roles); // conjunto de roles autorizadas para o handler
-
-  return (req: Request, res: Response, next: NextFunction) => {
-    const userRole = req.user?.role; // role proveniente do token ja validado
-
-    if (!userRole) {
-      return res.status(403).json({ error: "Acesso negado" });
-    }
-
-    if (!allowed.has(userRole)) {
-      return res.status(403).json({ error: "Acesso negado" });
-    }
-
-    return next(); // role autorizada, libera o fluxo para o handler seguinte
-  };
+  return allowRoles(...roles);
 }

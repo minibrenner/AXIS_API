@@ -8,6 +8,7 @@ const tenant_middleware_1 = require("./tenancy/tenant.middleware");
 const routes_1 = __importDefault(require("./modules/admin/routes"));
 const routes_2 = __importDefault(require("./routes"));
 require("./prisma/client");
+const httpErrors_1 = require("./utils/httpErrors");
 // porta padrao utilizada pelo servidor HTTP; caso a variavel nao exista, usamos 3000
 const PORT = Number(process.env.PORT) || 3000;
 // instancia principal do Express, responsavel por receber e responder requisicoes HTTP
@@ -24,9 +25,17 @@ app.use("/api/t/:tenantId", tenant_middleware_1.tenantMiddleware);
 // agrupamento das rotas HTTP da aplicacao sob o prefixo /api
 app.use("/api", routes_2.default);
 // tratador de erros padrao que traduz excecoes em respostas JSON
-const errorHandler = (err, _req, res) => {
-    console.error("Erro nao tratado:", err);
-    res.status(400).json({ error: err instanceof Error ? err.message : "Erro inesperado" });
+const errorHandler = (err, req, res, _next) => {
+    const httpError = (0, httpErrors_1.normalizeError)(err);
+    console.error("Erro nao tratado:", {
+        method: req.method,
+        path: req.originalUrl ?? req.url,
+        status: httpError.status,
+        code: httpError.code,
+        message: httpError.message,
+        stack: err instanceof Error ? err.stack : undefined,
+    });
+    res.status(httpError.status).json((0, httpErrors_1.buildErrorBody)(httpError));
 };
 app.use(errorHandler);
 // inicializa o servidor HTTP na porta definida, pronto para receber requisicoes externas

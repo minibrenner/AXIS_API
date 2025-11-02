@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.bootstrapOwnerGuard = void 0;
 const client_1 = require("../../../prisma/client");
 const middleware_1 = require("../../../auth/middleware");
+const httpErrors_1 = require("../../../utils/httpErrors");
 const authenticatedGuard = (0, middleware_1.jwtAuth)(true);
 const roleGuard = (0, middleware_1.requireRole)("ADMIN", "OWNER");
 /**
@@ -22,7 +23,11 @@ const bootstrapOwnerGuard = async (req, res, next) => {
     }
     const tenantId = req.tenantId;
     if (!tenantId) {
-        return res.status(400).json({ error: "Tenant nao identificado" });
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 400,
+            code: httpErrors_1.ErrorCodes.TENANT_NOT_RESOLVED,
+            message: "Tenant nao identificado.",
+        });
     }
     try {
         const tenant = await client_1.prisma.tenant.findUnique({
@@ -30,21 +35,38 @@ const bootstrapOwnerGuard = async (req, res, next) => {
             select: { ownerUserId: true },
         });
         if (!tenant) {
-            return res.status(404).json({ error: "Tenant nao encontrado" });
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 404,
+                code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
+                message: "Tenant nao encontrado.",
+                details: { tenantId },
+            });
         }
         if (tenant.ownerUserId) {
-            return res.status(401).json({ error: "Token ausente" });
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 401,
+                code: httpErrors_1.ErrorCodes.BOOTSTRAP_LOCKED,
+                message: "Bootstrap de owner nao esta mais disponivel para este tenant.",
+            });
         }
         const userCount = await client_1.prisma.user.count({ where: { tenantId } });
         if (userCount > 0) {
-            return res.status(401).json({ error: "Token ausente" });
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 401,
+                code: httpErrors_1.ErrorCodes.BOOTSTRAP_LOCKED,
+                message: "Bootstrap de owner ja foi utilizado. Realize login para criar novos usuarios.",
+            });
         }
         req.isBootstrapOwnerCreation = true;
         return next();
     }
     catch (error) {
         console.error("Falha ao validar bootstrap de owner:", error);
-        return res.status(500).json({ error: "Falha ao validar tenant." });
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 500,
+            code: httpErrors_1.ErrorCodes.INTERNAL,
+            message: "Falha ao validar tenant.",
+        });
     }
 };
 exports.bootstrapOwnerGuard = bootstrapOwnerGuard;
