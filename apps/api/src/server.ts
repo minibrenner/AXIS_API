@@ -19,8 +19,9 @@ app.use("/api/admin", adminRoutes);
 // middleware de autenticacao deve vir antes (descomente quando estiver implementado)
 // app.use(authMiddleware); // garante que tenantMiddleware receba o usuario ja autenticado
 
-// middleware que injeta o tenant atual no contexto do Prisma antes de chegar nas rotas
-app.use(tenantMiddleware);
+// middleware que injeta o tenant atual no contexto do Prisma para rotas que dependem dele
+app.use("/api/auth", tenantMiddleware);
+app.use("/api/t/:tenantId", tenantMiddleware);
 
 // agrupamento das rotas HTTP da aplicacao sob o prefixo /api
 app.use("/api", routes);

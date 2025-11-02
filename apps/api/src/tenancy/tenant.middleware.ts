@@ -14,8 +14,10 @@ export function tenantMiddleware(req: Request, _res: Response, next: NextFunctio
   const tenantFromUser = (req.user && (req.user.tid || req.user.tenantId)) as string | undefined;
   // Em ambientes de desenvolvimento/teste, permitimos informar o tenant diretamente no header.
   const tenantFromHeader = req.headers["x-tenant-id"] as string | undefined;
+  // Como as rotas usam o padrao /t/:tenantId, usamos o parametro como ultimo recurso.
+  const tenantFromParams = req.params?.tenantId as string | undefined;
   // Escolhemos o primeiro valor disponivel; se ambos existirem, o do usuario tem prioridade.
-  const tenantId = tenantFromUser || tenantFromHeader;
+  const tenantId = tenantFromUser || tenantFromHeader || tenantFromParams;
 
   if (!tenantId) {
     return next(new Error("Tenant nao identificado"));

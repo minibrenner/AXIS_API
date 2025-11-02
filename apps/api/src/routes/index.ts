@@ -1,19 +1,31 @@
+// apps/api/src/routes/index.ts
 import { Router } from "express";
-import tenantRouter from "../modules/tenant/routes";
-import adminRouter from "../modules/admin/routes"; // confirme o caminho
 
+import tenantRouter from "../modules/tenant/routes";
+import adminRouter from "../modules/admin/routes";
+import { authRouter } from "../auth/routes";
+import { tenantMiddleware } from "../tenancy/tenant.middleware";
+import { jwtAuth, requireRole } from "../auth/middleware";
 
 /**
- * Router raiz da API. Este arquivo concentra a uniao de todos os sub-routers
- * da aplicacao para que o servidor (`server.ts`) tenha um unico ponto de importacao.
+ * Router raiz da API. Centraliza o registro de todos os sub-routers.
  */
 const router = Router();
 
 /**
- * Agrupa rotas relacionadas a tenants sob o prefixo `/tenant`.
- * Resultado final: endpoints expostos como `/api/tenant/...`.
+ * Rotas públicas de autenticação: /api/auth/...
  */
-router.use("/tenant", tenantRouter);
-router.use("/admin", adminRouter);   // expõe /api/admin/...
+router.use("/auth", authRouter);
+
+/**
+ * Rotas multi-tenant (/api/t/:tenantId/...).
+ * tenantMiddleware descobre o tenant atual e os módulos internos cuidam da autenticação/roles.
+ */
+router.use("/t/:tenantId", tenantMiddleware, tenantRouter);
+
+/**
+ * Rotas administrativas globais com RBAC.
+ */
+router.use("/admin", jwtAuth(false), requireRole("ADMIN", "OWNER"), adminRouter);
 
 export default router;

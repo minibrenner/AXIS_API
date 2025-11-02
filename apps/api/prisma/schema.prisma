@@ -11,23 +11,24 @@ datasource db {
 enum Role {
   ADMIN
   ATTENDANT
+  OWNER
 }
 
 model Tenant {
-  id                 String     @id @default(cuid())
-  name               String     @unique
-  cnpj               String?    @unique
-  isActive           Boolean    @default(true)
-  users              User[]
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
-  Session            Session[]
-  cpfResLoja         String?    @unique
-  email              String     @unique
-  Supplier           Supplier[]
-  Product            Product[]
-  passwordHash       String
-  mustChangePassword Boolean    @default(true) // força troca no 1º login
+  id          String     @id @default(cuid())
+  name        String     @unique
+  cnpj        String?    @unique
+  isActive    Boolean    @default(true)
+  users       User[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  Session     Session[]
+  cpfResLoja  String?    @unique
+  email       String     @unique
+  Supplier    Supplier[]
+  Product     Product[]
+  ownerUserId String?    @unique
+  ownerUser   User?      @relation("TenantOwner", fields: [ownerUserId], references: [id])
 
   categories Category[] // FIX: back-relation obrigatório da relação Category.tenant
 
@@ -35,29 +36,39 @@ model Tenant {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  cpf           String?   @unique
-  tenantId      String
-  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  email         String
-  passwordHash  String
-  role          Role      @default(ATTENDANT)
-  pinSupervisor String?
-  isActive      Boolean   @default(true)
-  sessions      Session[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  name                String?
+  cpf                 String?   @unique
+  tenantId            String
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  email               String
+  passwordHash        String
+  role                Role      @default(ATTENDANT)
+  pinSupervisor       String?
+  isActive            Boolean   @default(true)
+  sessions            Session[]
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  mustChangePassword  Boolean   @default(false)
+  passwordUpdatedAt   DateTime  @default(now())
+  TenantOwner         Tenant?   @relation("TenantOwner")
+  failedLoginCount    Int       @default(0)
+  blockedUntil        DateTime?
+  resetTokenHash      String?
+  resetTokenExpiresAt DateTime?
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([isActive, role])
+  @@index([blockedUntil])
 }
 
 model Session {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  revokedAt DateTime?
+  jti       String?   @unique
 
   // multi-tenant por coluna
   tenantId String

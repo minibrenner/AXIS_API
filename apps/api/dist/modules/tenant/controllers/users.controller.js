@@ -1,74 +1,218 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteUser = exports.updateUser = exports.getUser = exports.listUsers = exports.createUser = void 0;
-const client_1 = require("../../../prisma/client");
+// apps/api/src/modules/tenant/controllers/users.controller.ts
+// Controlador do CRUD de usuarios por tenant. Cada handler reforca o isolamento entre tenants,
+// usa argon2 para hashing de senha e responde apenas com campos seguros.
+const client_1 = require("@prisma/client");
+const argon2_1 = __importDefault(require("argon2"));
+const client_2 = require("../../../prisma/client");
+/** Campos autorizados a sair na camada HTTP (passwordHash jamais e exposto). */
+const userSelectSafe = {
+    id: true,
+    tenantId: true,
+    email: true,
+    name: true,
+    role: true,
+    isActive: true,
+    mustChangePassword: true,
+    createdAt: true,
+    updatedAt: true,
+    passwordUpdatedAt: true,
+};
+const ALLOWED_ROLES = new Set(["ADMIN", "ATTENDANT", "OWNER"]);
+/** Normaliza qualquer role vinda do body para um valor aceito pelo enum da aplicacao. */
+function normalizeRole(role) {
+    const normalized = String(role ?? "").trim().toUpperCase();
+    return ALLOWED_ROLES.has(normalized) ? normalized : "ATTENDANT";
+}
+/** Identifica erros conhecidos do Prisma (unicidade, etc.) para respostas amigaveis. */
+function isPrismaKnownError(error) {
+    return error instanceof client_1.Prisma.PrismaClientKnownRequestError;
+}
+/** Padroniza os logs de erro emitidos pelo controller. */
+function toLog(error) {
+    const output = {};
+    if (error instanceof Error) {
+        output.name = error.name;
+        output.message = error.message;
+        output.stack = error.stack;
+    }
+    if (typeof error === "object" && error !== null) {
+        const record = error;
+        if (record.code)
+            output.code = record.code;
+        if (record.meta)
+            output.meta = record.meta;
+    }
+    return output;
+}
+/** Interrompe o fluxo caso o tenantId nao esteja presente no contexto. */
+function requireTenantId(req, res) {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+        res.status(400).json({ error: "Tenant nao identificado (tenantId ausente no contexto)." });
+        return undefined;
+    }
+    return tenantId;
+}
 /**
- * Cria um novo usuario associado ao tenant presente no contexto.
+ * POST /users - cria um usuario no tenant atual e armazena apenas o hash do refresh.
  */
 const createUser = async (req, res) => {
-    const { email, passwordHash, role = "ATTENDANT" } = req.body;
-    // tenantMiddleware garante que `req.tenantId` esteja presente antes de chegar aqui.
-    const tenantId = req.tenantId;
-    const user = await client_1.prisma.user.create({
-        data: { tenantId, email, passwordHash, role },
-    });
-    res.status(201).json(user);
+    const tenantId = requireTenantId(req, res);
+    if (!tenantId)
+        return;
+    const { email, password, name, role, isActive, mustChangePassword } = req.body;
+    const isBootstrap = req.isBootstrapOwnerCreation === true;
+    try {
+        const passwordHash = await argon2_1.default.hash(password);
+        const normalizedRole = normalizeRole(isBootstrap ? "OWNER" : role);
+        const activeFlag = isBootstrap ? true : isActive ?? true;
+        const mustChangePasswordFlag = isBootstrap ? false : mustChangePassword ?? false;
+        const user = await client_2.prisma.user.create({
+            data: {
+                tenantId,
+                email,
+                passwordHash,
+                name,
+                role: normalizedRole,
+                isActive: activeFlag,
+                mustChangePassword: mustChangePasswordFlag,
+            },
+            select: userSelectSafe,
+        });
+        if (isBootstrap && user.role === "OWNER") {
+            await client_2.prisma.tenant
+                .update({
+                where: { id: tenantId },
+                data: { ownerUserId: user.id },
+            })
+                .catch((error) => {
+                console.error("Falha ao vincular owner ao tenant:", toLog(error));
+            });
+        }
+        return res.status(201).json(user);
+    }
+    catch (error) {
+        console.error("Falha ao criar usuario [details]:", toLog(error));
+        if (isPrismaKnownError(error) && error.code === "P2002") {
+            const target = error.meta?.target?.join(", ");
+            return res.status(409).json({ error: `Conflito de unicidade nos campos: ${target ?? "dados"}` });
+        }
+        return res.status(500).json({ error: "Falha ao criar usuario." });
+    }
 };
 exports.createUser = createUser;
 /**
- * Lista os usuarios pertencentes ao tenant atual, ordenados por criacao.
+ * GET /users - lista usuarios do tenant com pagina simples (sem filtros adicionais).
  */
-const listUsers = async (_req, res) => {
-    // `prisma.user.findMany` ja aplica o filtro de tenant via withTenantExtension.
-    const users = await client_1.prisma.user.findMany({ orderBy: { createdAt: "desc" } });
-    res.json(users);
+const listUsers = async (req, res) => {
+    const tenantId = requireTenantId(req, res);
+    if (!tenantId)
+        return;
+    const users = await client_2.prisma.user.findMany({
+        where: { tenantId },
+        select: userSelectSafe,
+    });
+    return res.json(users);
 };
 exports.listUsers = listUsers;
+/**
+ * GET /users/:id - recupera apenas usuarios pertencentes ao tenant corrente.
+ */
 const getUser = async (req, res) => {
+    const tenantId = requireTenantId(req, res);
+    if (!tenantId)
+        return;
     const { id } = req.params;
-    try {
-        const user = await client_1.prisma.user.findFirst({
-            where: { id },
-        });
-        if (!user) {
-            return res.status(404).json({ error: "Usuario nao encontrado." });
-        }
-        return res.json(user);
+    const user = await client_2.prisma.user.findFirst({
+        where: { id, tenantId },
+        select: userSelectSafe,
+    });
+    if (!user) {
+        return res.status(404).json({ error: "Usuario nao encontrado." });
     }
-    catch (error) {
-        console.error("Falha ao obter usuario:", error);
-        return res.status(500).json({ error: "Falha ao obter usuario." });
-    }
+    return res.json(user);
 };
 exports.getUser = getUser;
+/**
+ * PUT /users/:id - atualiza dados do usuario garantindo isolamento multi-tenant.
+ * Se uma nova senha vier, o hash e atualizado e passwordUpdatedAt e avançado.
+ */
 const updateUser = async (req, res) => {
+    const tenantId = requireTenantId(req, res);
+    if (!tenantId)
+        return;
     const { id } = req.params;
-    const { email, passwordHash, role } = req.body;
+    const { email, password, name, role, isActive, mustChangePassword } = req.body;
+    const data = {};
+    if (email !== undefined)
+        data.email = email;
+    if (name !== undefined)
+        data.name = name;
+    if (role !== undefined)
+        data.role = normalizeRole(role);
+    if (isActive !== undefined)
+        data.isActive = isActive;
+    if (mustChangePassword !== undefined)
+        data.mustChangePassword = mustChangePassword;
+    if (password) {
+        data.passwordHash = await argon2_1.default.hash(password);
+        data.passwordUpdatedAt = new Date();
+        if (mustChangePassword === undefined) {
+            data.mustChangePassword = false;
+        }
+    }
     try {
-        const user = await client_1.prisma.user.update({
-            where: { id },
-            data: { email, passwordHash, role },
+        const result = await client_2.prisma.user.updateMany({
+            where: { id, tenantId },
+            data,
         });
-        return res.json(user);
+        if (result.count === 0) {
+            return res.status(404).json({ error: "Usuario nao encontrado." });
+        }
+        const updated = await client_2.prisma.user.findFirst({
+            where: { id, tenantId },
+            select: userSelectSafe,
+        });
+        return res.json(updated);
     }
     catch (error) {
-        console.error("Falha ao atualizar usuario:", error);
+        console.error("Falha ao atualizar usuario [details]:", toLog(error));
+        if (isPrismaKnownError(error) && error.code === "P2002") {
+            const target = error.meta?.target?.join(", ");
+            return res.status(409).json({ error: `Conflito de unicidade nos campos: ${target ?? "dados"}` });
+        }
         return res.status(500).json({ error: "Falha ao atualizar usuario." });
     }
 };
 exports.updateUser = updateUser;
+/**
+ * DELETE /users/:id - remove usuario do tenant sem afetar dados de outros tenants.
+ */
 const deleteUser = async (req, res) => {
+    const tenantId = requireTenantId(req, res);
+    if (!tenantId)
+        return;
     const { id } = req.params;
     try {
-        await client_1.prisma.user.delete({
-            where: { id },
+        const result = await client_2.prisma.user.deleteMany({
+            where: { id, tenantId },
         });
+        if (result.count === 0) {
+            return res.status(404).json({ error: "Usuario nao encontrado." });
+        }
         return res.status(204).send();
     }
     catch (error) {
-        console.error("Falha ao deletar usuario:", error);
+        console.error("Falha ao deletar usuario [details]:", toLog(error));
         return res.status(500).json({ error: "Falha ao deletar usuario." });
     }
 };
 exports.deleteUser = deleteUser;
+exports.default = { createUser: exports.createUser, listUsers: exports.listUsers, getUser: exports.getUser, updateUser: exports.updateUser, deleteUser: exports.deleteUser };
 //# sourceMappingURL=users.controller.js.map

@@ -18,8 +18,9 @@ app.use(express_1.default.json());
 app.use("/api/admin", routes_1.default);
 // middleware de autenticacao deve vir antes (descomente quando estiver implementado)
 // app.use(authMiddleware); // garante que tenantMiddleware receba o usuario ja autenticado
-// middleware que injeta o tenant atual no contexto do Prisma antes de chegar nas rotas
-app.use(tenant_middleware_1.tenantMiddleware);
+// middleware que injeta o tenant atual no contexto do Prisma para rotas que dependem dele
+app.use("/api/auth", tenant_middleware_1.tenantMiddleware);
+app.use("/api/t/:tenantId", tenant_middleware_1.tenantMiddleware);
 // agrupamento das rotas HTTP da aplicacao sob o prefixo /api
 app.use("/api", routes_2.default);
 // tratador de erros padrao que traduz excecoes em respostas JSON
