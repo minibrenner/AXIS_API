@@ -33,7 +33,7 @@ model Tenant {
   ownerUserId String?    @unique
   ownerUser   User?      @relation("TenantOwner", fields: [ownerUserId], references: [id])
 
-  categories Category[] // FIX: back-relation obrigatÃ³rio da relaÃ§Ã£o Category.tenant
+  categories Category[] // FIX: back-relation obrigatório da relação Category.tenant
 
   @@index([isActive, createdAt])
 }
@@ -135,7 +135,7 @@ model Supplier {
 
   @@unique([tenantId, cnpj], name: "supplier_cnpj_per_tenant")
   @@unique([tenantId, code], name: "supplier_code_per_tenant")
-  @@unique([id, tenantId], name: "supplier_id_tenant_unique") // OK: necessÃ¡rio p/ FK composta Productâ†’Supplier
+  @@unique([id, tenantId], name: "supplier_id_tenant_unique") // OK: necessário p/ FK composta Product→Supplier
   @@index([tenantId, name])
   @@map("fornecedores")
 }
@@ -150,21 +150,18 @@ enum Unit {
   LT  // litro
   GR // grama 
   ML // mililitro
-  PC // Pacote ou PeÃ§a
+  PC // Pacote ou Peça
 }
 
 
 model Product {
   id          String   @id @default(cuid())
   tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  supplierId  String?
-  supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   categoryId  String?
   category    Category? @relation(fields: [categoryId], references: [id])
   name        String
   sku         String    @default("")
-  minQuantity Decimal?  @db.Decimal(14,3)
+  minQuantity   Decimal?      @db.Decimal(14,3)
   barcode     String?
   unit        Unit      @default(UN)
   price       Decimal   @db.Decimal(10,2)
@@ -172,7 +169,7 @@ model Product {
   minStock    Decimal?  @db.Decimal(14,3)
   isActive    Boolean   @default(true)
 
-  // Campos fiscais (preparaÃ§Ã£o p/ fases futuras)
+  // Campos fiscais (preparação p/ fases futuras)
   ncm         String?
   cest        String?
   csosn       String?
@@ -181,25 +178,21 @@ model Product {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  inventories    Inventory[]
-  stockMovements StockMovement[]
-  purchaseItems  PurchaseItem[]
+  inventories Inventory[]
 
   @@index([tenantId, name])
   @@index([tenantId, barcode])
-  @@unique([tenantId, sku])         // SKU Ãºnico por tenant
-  @@unique([tenantId, barcode])     // se quiser permitir repetiÃ§Ã£o, remova esta e mantenha apenas @@index
+  @@unique([tenantId, sku])         // SKU único por tenant
+  @@unique([tenantId, barcode])     // se quiser permitir repetição, remova esta e mantenha apenas @@index
 }
 
 
 model Category {
   id        String   @id @default(cuid())
   tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  products  Product[]
 
   @@index([tenantId, name])
   @@unique([tenantId, name]) // evita duplicidade por tenant
@@ -209,13 +202,11 @@ model Category {
 model StockLocation {
   id        String   @id @default(cuid())
   tenantId  String
-  name      String   // ex.: "BalcÃ£o", "Cozinha", "DepÃ³sito"
+  name      String   // ex.: "Balcão", "Cozinha", "Depósito"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  inventories    Inventory[]
-  stockMovements StockMovement[]
-  purchaseItems  PurchaseItem[]
+  inventories Inventory[]
 
   @@unique([tenantId, name]) // evita duplicidade por tenant
 }
@@ -227,9 +218,8 @@ model Inventory {
   productId     String
   locationId    String
   quantity      Decimal       @db.Decimal(14,3) @default(0)
-
-  minQuantity   Decimal?      @db.Decimal(14,3) // <- ADICIONE: mínimo por local
-  version       Int           @default(0)
+  
+  version       Int           @default(0) // para lock otimista
   updatedAt     DateTime      @updatedAt
 
   product       Product       @relation(fields: [productId], references: [id])
@@ -240,14 +230,7 @@ model Inventory {
   @@index([tenantId, productId])
 }
 
-
-enum MovementType {
-  IN
-  OUT
-  ADJUST
-  CANCEL
-  RETURN
-}
+enum MovementType { IN OUT ADJUST CANCEL RETURN }
 
 model StockMovement {
   id          String        @id @default(cuid())
@@ -261,14 +244,10 @@ model StockMovement {
   diffJson    String?
   createdBy   String?       // userId
   createdAt   DateTime      @default(now())
-  beforeQuantity String? // snapshot antes
-  afterQuantity  String? // snapshot depois
-  oversell       Boolean @default(false)
 
   product     Product       @relation(fields: [productId], references: [id])
   location    StockLocation @relation(fields: [locationId], references: [id])
 
-  @@index([tenantId, type, createdAt, productId], name: "idx_sm_tenant_type_created_product")
   @@index([tenantId, productId, createdAt])
   @@index([tenantId, locationId, createdAt])
 }
@@ -303,27 +282,4 @@ model PurchaseItem {
 }
 
 
-//------------------------- VENDAS -----------------------------------
-
-model ProcessedSale {
-  id              String   @id @default(cuid())
-  tenantId        String
-  saleId          String
-  deviceId        String?
-  clientCreatedAt DateTime?
-  status          SaleStatus @default(PENDING) // PENDING | DONE | ERROR
-  errorMessage    String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-
-  @@unique([tenantId, saleId], name: "tenantId_saleId")
-  @@unique([tenantId, type, refId], name: "uniq_movement_by_ref")
-
-}
-
-enum SaleStatus {
-  PENDING
-  DONE
-  ERROR
-}
 

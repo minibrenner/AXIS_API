@@ -1,4 +1,5 @@
 {
+	"name": "api",
 	"dependencies": {
 		"@prisma/client": "6.18.0",
 		"argon2": "^0.44.0",
@@ -26,7 +27,8 @@
 		"prisma:gen": "prisma generate",
 		"prisma:studio": "prisma studio",
 		"postinstall": "prisma generate",
-		"db:seed": "prisma db seed"
+		"db:seed": "prisma db seed",
+		"seed:fase2": "node dist/prisma/seed_fase2.js"
 	},
 	"prisma": {
 		"seed": "tsx prisma/seed.ts"

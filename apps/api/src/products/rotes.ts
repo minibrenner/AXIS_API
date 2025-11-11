@@ -4,12 +4,10 @@ import { jwtAuth } from "../auth/middleware";
 import { withZod } from "../utils/zodMiddleware";
 import { createProductSchema, updateProductSchema } from "./dto";
 import { listProducts, createProduct, updateProduct, softDeleteProduct, getProduct } from "./service";
-import { tenantFromUserMiddleware } from "../tenancy/tenantFromUser.middleware";
 
 export const productsRouter = Router();
 
-productsRouter.use(jwtAuth(false));
-productsRouter.use(tenantFromUserMiddleware);
+productsRouter.use(jwtAuth());
 
 productsRouter.get("/", async (req, res) => {
   const q = (req.query.q as string | undefined) ?? undefined;

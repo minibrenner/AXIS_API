@@ -5,6 +5,8 @@ import routes from "./routes";
 import "./prisma/client";
 import { buildErrorBody, normalizeError } from "./utils/httpErrors";
 
+
+
 // porta padrao utilizada pelo servidor HTTP; caso a variavel nao exista, usamos 3000
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -28,7 +30,7 @@ app.use("/api/t/:tenantId", tenantMiddleware);
 app.use("/api", routes);
 
 // tratador de erros padrao que traduz excecoes em respostas JSON
-const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
+const errorHandler: ErrorRequestHandler = (err, req, res) => {
   const httpError = normalizeError(err);
 
   console.error("Erro nao tratado:", {

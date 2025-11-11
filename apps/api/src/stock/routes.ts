@@ -12,7 +12,6 @@ import {
   getStockLevel,
   initializeInventory,
 } from "./service";
-import { tenantFromUserMiddleware } from "../tenancy/tenantFromUser.middleware";
 
 const inSchema = z.object({ productId: z.string(), locationId: z.string(), qty: z.coerce.number().positive(), reason: z.string().optional() });
 const outSchema = inSchema.extend({ saleId: z.string().optional() });
@@ -34,8 +33,7 @@ const initBulkBodySchema = z.object({
 });
 
 export const stockRouter = Router();
-stockRouter.use(jwtAuth(false));
-stockRouter.use(tenantFromUserMiddleware);
+stockRouter.use(jwtAuth());
 
 // Entrada de estoque (ADMIN)
 stockRouter.post("/in", allowRoles("ADMIN"), async (req, res) => {
