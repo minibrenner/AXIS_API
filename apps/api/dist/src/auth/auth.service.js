@@ -21,8 +21,8 @@ const jwt_1 = require("./jwt"); // funções de suporte que assinam tokens de ac
  * @returns Instância do usuário quando a senha confere e o usuário está ativo; caso contrário null.
  */
 async function validateUser(email, password) {
-    // procura um usuário com o e-mail informado dentro do tenant atual
-    const user = await client_1.prisma.user.findFirst({ where: { email } });
+    // procura um usuario globalmente pelo e-mail (antes de sabermos o tenant)
+    const user = await client_1.basePrisma.user.findFirst({ where: { email } });
     // impede login de contas inexistentes ou desativadas
     if (!user || !user.isActive)
         return null;

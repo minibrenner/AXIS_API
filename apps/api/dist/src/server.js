@@ -4,9 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const tenant_middleware_1 = require("./tenancy/tenant.middleware");
-const routes_1 = __importDefault(require("./modules/admin/routes"));
-const routes_2 = __importDefault(require("./routes"));
+const routes_1 = __importDefault(require("./routes"));
+const routes_2 = __importDefault(require("./super-admin/routes"));
 require("./prisma/client");
 const httpErrors_1 = require("./utils/httpErrors");
 // porta padrao utilizada pelo servidor HTTP; caso a variavel nao exista, usamos 3000
@@ -15,15 +14,10 @@ const PORT = Number(process.env.PORT) || 3000;
 const app = (0, express_1.default)();
 // middleware que converte payloads JSON em objetos JavaScript acessiveis via req.body
 app.use(express_1.default.json());
-// rotas administrativas nao dependem de tenant e devem ser registradas antes do middleware multi-tenant
-app.use("/api/admin", routes_1.default);
-// middleware de autenticacao deve vir antes (descomente quando estiver implementado)
-// app.use(authMiddleware); // garante que tenantMiddleware receba o usuario ja autenticado
-// middleware que injeta o tenant atual no contexto do Prisma para rotas que dependem dele
-app.use("/api/auth", tenant_middleware_1.tenantMiddleware);
-app.use("/api/t/:tenantId", tenant_middleware_1.tenantMiddleware);
+// rota de super admin fica antes de qualquer verificação para criação isolada de tenants
+app.use("/api/super-admin", routes_2.default);
 // agrupamento das rotas HTTP da aplicacao sob o prefixo /api
-app.use("/api", routes_2.default);
+app.use("/api", routes_1.default);
 // tratador de erros padrao que traduz excecoes em respostas JSON
 const errorHandler = (err, req, res) => {
     const httpError = (0, httpErrors_1.normalizeError)(err);

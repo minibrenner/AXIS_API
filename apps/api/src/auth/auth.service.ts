@@ -1,7 +1,7 @@
 // apps/api/src/auth/auth.service.ts
 // Serviço central de autenticação: valida logins, emite tokens JWT e persiste sessões de refresh.
 import argon2 from "argon2"; // biblioteca de hashing utilizada para verificar e criar hashes inquebráveis
-import { prisma } from "../prisma/client"; // cliente Prisma que aplica o escopo multi-tenant automaticamente
+import { basePrisma, prisma } from "../prisma/client"; // cliente Prisma que aplica o escopo multi-tenant automaticamente
 import { signAccess, signRefresh } from "./jwt"; // funções de suporte que assinam tokens de acesso e refresh
 
 /**
@@ -16,8 +16,8 @@ import { signAccess, signRefresh } from "./jwt"; // funções de suporte que ass
 
 
 export async function validateUser(email: string, password: string) {
-    // procura um usuário com o e-mail informado dentro do tenant atual
-    const user = await prisma.user.findFirst({ where: { email } });
+    // procura um usuario globalmente pelo e-mail (antes de sabermos o tenant)
+    const user = await basePrisma.user.findFirst({ where: { email } });
     // impede login de contas inexistentes ou desativadas
     if (!user || !user.isActive) return null;
 
@@ -75,3 +75,6 @@ export async function revokeAllUserSessions(userId: string) {
     // remove todas as sessões vinculadas ao usuário, evitando uso posterior de refresh tokens antigos
     await prisma.session.deleteMany({ where: { userId } });
 }
+
+
+

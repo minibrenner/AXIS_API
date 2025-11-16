@@ -1,10 +1,8 @@
 // apps/api/src/categories/routes.ts (resumo)
 import { Router } from "express";
 import { prisma } from "../prisma/client";
-import { jwtAuth } from "../auth/middleware";
 
 export const categoriesRouter = Router();
-categoriesRouter.use(jwtAuth);
 
 categoriesRouter.post("/", async (req, res) => {
   const created = await prisma.category.create({ data: { tenantId: req.user!.tenantId, name: req.body.name } });

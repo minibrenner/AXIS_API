@@ -10,6 +10,12 @@ const routes_2 = __importDefault(require("../modules/admin/routes"));
 const routes_3 = require("../auth/routes");
 const tenant_middleware_1 = require("../tenancy/tenant.middleware");
 const middleware_1 = require("../auth/middleware");
+const routes_4 = require("../categories/routes");
+const rotes_1 = require("../products/rotes");
+const routes_5 = __importDefault(require("../stock/routes"));
+const routes_6 = __importDefault(require("../sales/routes"));
+const routes_7 = __importDefault(require("../fiscal/routes"));
+const routes_8 = require("../cash/routes");
 /**
  * Router raiz da API. Centraliza o registro de todos os sub-routers.
  */
@@ -27,5 +33,19 @@ router.use("/t/:tenantId", tenant_middleware_1.tenantMiddleware, routes_1.defaul
  * Rotas administrativas globais com RBAC.
  */
 router.use("/admin", (0, middleware_1.jwtAuth)(false), (0, middleware_1.requireRole)("ADMIN", "OWNER"), routes_2.default);
+/**
+ * Rotas autenticadas que utilizam o tenant do token (painel principal).
+ */
+const secureRoutes = [
+    ["/categories", routes_4.categoriesRouter],
+    ["/products", rotes_1.productsRouter],
+    ["/stock", routes_5.default],
+    ["/sales", routes_6.default],
+    ["/fiscal", routes_7.default],
+    ["/cash", routes_8.cashRouter],
+];
+for (const [prefix, childRouter] of secureRoutes) {
+    router.use(prefix, (0, middleware_1.jwtAuth)(false), tenant_middleware_1.tenantMiddleware, childRouter);
+}
 exports.default = router;
 //# sourceMappingURL=index.js.map

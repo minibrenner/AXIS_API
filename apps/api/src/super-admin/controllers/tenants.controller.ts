@@ -1,10 +1,10 @@
-// apps/api/src/modules/admin/controllers/tenants.controller.ts
-// CRUD administrativo de tenants com checagens de unicidade e mensagens amigaveis.
+// apps/api/src/super-admin/controllers/tenants.controller.ts
+// CRUD administrativo exclusivo do super admin com checagens de unicidade e mensagens amigaveis.
 import { Prisma } from "@prisma/client";
 import { type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
-import { prisma } from "../../../prisma/client";
-import { ErrorCodes, respondWithError } from "../../../utils/httpErrors";
+import { prisma } from "../../prisma/client";
+import { ErrorCodes, respondWithError } from "../../utils/httpErrors";
 
 function isPrismaKnownError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
   return error instanceof Prisma.PrismaClientKnownRequestError;
@@ -35,13 +35,49 @@ function formatUniqueTarget(target: unknown): string {
   return "dados";
 }
 
-const resolveTenantUniqueWhere = (identifier: string) => {
-  const digitsOnly = identifier.replace(/\D/g, "");
+export const buildTenantWhereCandidates = (identifier: string): Prisma.TenantWhereUniqueInput[] => {
+  const trimmed = identifier.trim();
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  const candidates: Prisma.TenantWhereUniqueInput[] = [];
+
   if (digitsOnly.length === 14) {
-    return { cnpj: digitsOnly } as const;
+    candidates.push({ cnpj: digitsOnly });
   }
-  return { id: identifier } as const;
+
+  if (digitsOnly.length === 11) {
+    candidates.push({ cpfResLoja: digitsOnly });
+  }
+
+  if (trimmed) {
+    candidates.push({ id: trimmed });
+    candidates.push({ name: trimmed });
+  }
+
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key = Object.entries(candidate)
+      .map(([k, v]) => `${k}:${v}`)
+      .join("-");
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 };
+
+export async function findTenantByIdentifier(identifier: string) {
+  const candidates = buildTenantWhereCandidates(identifier);
+
+  for (const where of candidates) {
+    const tenant = await prisma.tenant.findUnique({ where });
+    if (tenant) {
+      return tenant;
+    }
+  }
+
+  return null;
+}
 
 export const createTenant = async (req: Request, res: Response) => {
   const payload = (req.body ?? {}) as {
@@ -138,28 +174,31 @@ export const createTenant = async (req: Request, res: Response) => {
 export const deleteTenant = async (req: Request, res: Response) => {
   const { identifier } = req.params;
 
-  try {
-    await prisma.tenant.delete({
-      where: resolveTenantUniqueWhere(identifier),
-    });
+  const candidates = buildTenantWhereCandidates(identifier);
 
-    return res.status(204).send();
-  } catch (error: unknown) {
-    if (isPrismaKnownError(error) && error.code === "P2025") {
+  for (const where of candidates) {
+    try {
+      await prisma.tenant.delete({ where });
+      return res.status(204).send();
+    } catch (error: unknown) {
+      if (isPrismaKnownError(error) && error.code === "P2025") {
+        continue;
+      }
+      console.error("Falha ao deletar tenant:", toLog(error));
       return respondWithError(res, {
-        status: 404,
-        code: ErrorCodes.TENANT_NOT_FOUND,
-        message: "Tenant nao encontrado.",
-        details: { identifier },
+        status: 500,
+        code: ErrorCodes.INTERNAL,
+        message: "Falha ao deletar tenant.",
       });
     }
-    console.error("Falha ao deletar tenant:", toLog(error));
-    return respondWithError(res, {
-      status: 500,
-      code: ErrorCodes.INTERNAL,
-      message: "Falha ao deletar tenant.",
-    });
   }
+
+  return respondWithError(res, {
+    status: 404,
+    code: ErrorCodes.TENANT_NOT_FOUND,
+    message: "Tenant nao encontrado.",
+    details: { identifier },
+  });
 };
 
 export const listTenants = async (_req: Request, res: Response) => {
@@ -171,9 +210,7 @@ export const getTenant = async (req: Request, res: Response) => {
   const { identifier } = req.params;
 
   try {
-    const tenant = await prisma.tenant.findUnique({
-      where: resolveTenantUniqueWhere(identifier),
-    });
+    const tenant = await findTenantByIdentifier(identifier);
 
     if (!tenant) {
       return respondWithError(res, {
@@ -211,41 +248,48 @@ export const updateTenant = async (req: Request, res: Response) => {
     data.mustChangePassword = true;
   }
 
-  try {
-    const tenant = await prisma.tenant.update({
-      where: resolveTenantUniqueWhere(identifier),
-      data,
-    });
+  const candidates = buildTenantWhereCandidates(identifier);
+  const updatePayload = data as Prisma.TenantUpdateInput;
 
-    return res.json(tenant);
-  } catch (error: unknown) {
-    if (isPrismaKnownError(error)) {
-      if (error.code === "P2025") {
-        return respondWithError(res, {
-          status: 404,
-          code: ErrorCodes.TENANT_NOT_FOUND,
-          message: "Tenant nao encontrado.",
-          details: { identifier },
-        });
+  for (const where of candidates) {
+    try {
+      const tenant = await prisma.tenant.update({
+        where,
+        data: updatePayload,
+      });
+
+      return res.json(tenant);
+    } catch (error: unknown) {
+      if (isPrismaKnownError(error)) {
+        if (error.code === "P2025") {
+          continue;
+        }
+        if (error.code === "P2002") {
+          const target = formatUniqueTarget(error.meta?.target);
+          return respondWithError(res, {
+            status: 409,
+            code: ErrorCodes.TENANT_CONFLICT,
+            message: "Ja existe um tenant com os dados fornecidos.",
+            ...(target ? { details: { target } } : {}),
+          });
+        }
       }
-      if (error.code === "P2002") {
-        const target = formatUniqueTarget(error.meta?.target);
-        return respondWithError(res, {
-          status: 409,
-          code: ErrorCodes.TENANT_CONFLICT,
-          message: "Ja existe um tenant com os dados fornecidos.",
-          ...(target ? { details: { target } } : {}),
-        });
-      }
+
+      console.error("Falha ao atualizar tenant:", toLog(error));
+      return respondWithError(res, {
+        status: 500,
+        code: ErrorCodes.INTERNAL,
+        message: "Falha ao atualizar tenant.",
+      });
     }
-
-    console.error("Falha ao atualizar tenant:", toLog(error));
-    return respondWithError(res, {
-      status: 500,
-      code: ErrorCodes.INTERNAL,
-      message: "Falha ao atualizar tenant.",
-    });
   }
+
+  return respondWithError(res, {
+    status: 404,
+    code: ErrorCodes.TENANT_NOT_FOUND,
+    message: "Tenant nao encontrado.",
+    details: { identifier },
+  });
 };
 
 export default { createTenant, deleteTenant, listTenants, getTenant, updateTenant };

@@ -1,96 +1,135 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.reportsRouter = void 0;
-// apps/api/src/reports/routes.ts (resumo)
+// apps/api/src/reports/routes.ts
 const express_1 = require("express");
-const client_1 = require("@prisma/client");
-const client_2 = require("../prisma/client");
+const client_1 = require("../prisma/client");
 const middleware_1 = require("../auth/middleware");
 const zod_1 = require("zod");
 exports.reportsRouter = (0, express_1.Router)();
 exports.reportsRouter.use(middleware_1.jwtAuth);
-// GET /reports/min-stock?bufferPct=10
+/**
+ * GET /reports/min-stock?bufferPct=10&locationId=&productId=&limit=200
+ * Retorna estoque abaixo do mínimo (LOW) e até buffer% acima do mínimo (NEAR).
+ * Tudo filtrado/ordenado no banco. Traaz somente campos necessários.
+ */
 exports.reportsRouter.get("/min-stock", async (req, res) => {
     const qp = zod_1.z.object({
         bufferPct: zod_1.z.coerce.number().min(0).max(100).default(10),
         locationId: zod_1.z.string().optional(),
         productId: zod_1.z.string().optional(),
+        limit: zod_1.z.coerce.number().int().min(1).max(500).default(200),
     }).parse(req.query);
-    const rows = await client_2.prisma.inventory.findMany({
-        where: {
-            tenantId: req.user.tenantId,
-            locationId: qp.locationId,
-            productId: qp.productId,
-        },
-        include: { product: true, location: true },
+    const factor = 1 + qp.bufferPct / 100;
+    const rows = await client_1.prisma.$queryRaw `
+    SELECT
+      i.id  AS inv_id,
+      i."productId"  AS product_id,
+      i."locationId" AS location_id,
+      i.quantity,
+      COALESCE(i."minQuantity", p."minStock") AS min_eff,
+      (i.quantity / COALESCE(i."minQuantity", p."minStock"))::float AS ratio,
+      CASE
+        WHEN i.quantity < COALESCE(i."minQuantity", p."minStock") THEN 'LOW'
+        ELSE 'NEAR'
+      END AS status,
+      p.name AS product_name,
+      p.sku  AS product_sku,
+      l.name AS location_name
+    FROM "Inventory" i
+    JOIN "Product"  p ON p.id = i."productId"  AND p."tenantId" = i."tenantId"
+    JOIN "Location" l ON l.id = i."locationId" AND l."tenantId" = i."tenantId"
+    WHERE i."tenantId" = ${req.user.tenantId}
+      AND (${qp.locationId} IS NULL OR i."locationId" = ${qp.locationId})
+      AND (${qp.productId} IS NULL  OR i."productId"  = ${qp.productId})
+      AND COALESCE(i."minQuantity", p."minStock") IS NOT NULL
+      AND i.quantity <= COALESCE(i."minQuantity", p."minStock") * ${factor}
+    ORDER BY ratio ASC
+    LIMIT ${qp.limit}
+  `;
+    res.json({
+        bufferPct: qp.bufferPct,
+        items: rows.map(r => ({
+            id: r.inv_id,
+            product: { id: r.product_id, name: r.product_name, sku: r.product_sku },
+            location: { id: r.location_id, name: r.location_name },
+            quantity: r.quantity?.toString?.() ?? String(r.quantity),
+            minEffective: r.min_eff?.toString?.() ?? String(r.min_eff),
+            status: r.status, // "LOW" (<min) ou "NEAR" (<= min*(1+buffer))
+            ratio: r.ratio, // <1 baixo do mínimo; 1..1+buffer perto do mínimo
+            gapToMin: (Number(r.quantity) - Number(r.min_eff)).toString(),
+        })),
     });
-    const buffer = new client_1.Prisma.Decimal(1).plus(new client_1.Prisma.Decimal(qp.bufferPct).div(100));
-    const flagged = rows
-        .map((r) => {
-        const minEff = r.product.minStock ?? null;
-        if (minEff === null)
-            return null;
-        const qty = new client_1.Prisma.Decimal(r.quantity);
-        const min = new client_1.Prisma.Decimal(minEff);
-        const nearThreshold = min.mul(buffer); // min * (1 + buffer%)
-        let status = null;
-        if (qty.lt(min))
-            status = "LOW";
-        else if (qty.lte(nearThreshold))
-            status = "NEAR";
-        if (!status)
-            return null;
-        const ratio = qty.div(min); // para ordenar por urgência
-        return {
-            id: r.id,
-            product: r.product,
-            location: r.location,
-            quantity: qty.toString(),
-            minEffective: min.toString(),
-            nearThreshold: nearThreshold.toString(),
-            status,
-            ratio: ratio.toNumber(),
-            gapToMin: qty.minus(min).toString(), // negativo = faltando
-        };
-    })
-        .filter((item) => Boolean(item))
-        .sort((a, b) => a.ratio - b.ratio); // mais crítico primeiro
-    res.json({ items: flagged, bufferPct: qp.bufferPct });
 });
+/**
+ * GET /reports/top-sold?from=2025-10-01&to=2025-11-10&limit=10
+ * Top produtos por saída (OUT) no período — join direto com Product (sem segunda query).
+ */
 exports.reportsRouter.get("/top-sold", async (req, res) => {
     const qp = zod_1.z.object({
-        from: zod_1.z.string().optional(),
-        to: zod_1.z.string().optional()
+        from: zod_1.z.coerce.date().optional(),
+        to: zod_1.z.coerce.date().optional(),
+        limit: zod_1.z.coerce.number().int().min(1).max(100).default(10),
     }).parse(req.query);
-    const from = qp.from ? new Date(qp.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const to = qp.to ? new Date(qp.to) : new Date();
-    const rows = await client_2.prisma.stockMovement.groupBy({
-        by: ["productId"],
-        where: { tenantId: req.user.tenantId, type: "OUT", createdAt: { gte: from, lte: to } },
-        _sum: { quantity: true },
-        orderBy: { _sum: { quantity: "desc" } },
-        take: 10
-    });
-    const products = await client_2.prisma.product.findMany({ where: { id: { in: rows.map(r => r.productId) } } });
-    const map = new Map(products.map(p => [p.id, p]));
-    res.json(rows.map(r => ({ product: map.get(r.productId), totalOut: r._sum.quantity })));
+    const from = qp.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const to = qp.to ?? new Date();
+    const rows = await client_1.prisma.$queryRaw `
+    SELECT
+      sm."productId" AS product_id,
+      SUM(sm.quantity) AS total_out,
+      p.name AS product_name,
+      p.sku  AS product_sku
+    FROM "StockMovement" sm
+    JOIN "Product" p
+      ON p.id = sm."productId"
+     AND p."tenantId" = sm."tenantId"
+    WHERE sm."tenantId" = ${req.user.tenantId}
+      AND sm.type = 'OUT'
+      AND sm."createdAt" >= ${from}
+      AND sm."createdAt" <= ${to}
+    GROUP BY sm."productId", p.name, p.sku
+    ORDER BY total_out DESC
+    LIMIT ${qp.limit}
+  `;
+    res.json(rows.map(r => ({
+        product: { id: r.product_id, name: r.product_name, sku: r.product_sku },
+        totalOut: r.total_out?.toString?.() ?? String(r.total_out),
+    })));
 });
+/**
+ * GET /reports/bad-sold?from=...&to=...&limit=10
+ * “Piores vendedores” (menos saída) no período — mesma ideia do top, invertendo ordenação.
+ */
 exports.reportsRouter.get("/bad-sold", async (req, res) => {
     const qp = zod_1.z.object({
-        from: zod_1.z.string().optional(),
-        to: zod_1.z.string().optional()
+        from: zod_1.z.coerce.date().optional(),
+        to: zod_1.z.coerce.date().optional(),
+        limit: zod_1.z.coerce.number().int().min(1).max(100).default(10),
     }).parse(req.query);
-    const from = qp.from ? new Date(qp.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const to = qp.to ? new Date(qp.to) : new Date();
-    const rows = await client_2.prisma.stockMovement.groupBy({
-        by: ["productId"],
-        where: { tenantId: req.user.tenantId, type: "OUT", createdAt: { gte: from, lte: to } },
-        _sum: { quantity: true },
-        orderBy: { _sum: { quantity: "asc" } },
-        take: 10
-    });
-    const products = await client_2.prisma.product.findMany({ where: { id: { in: rows.map(r => r.productId) } } });
-    const map = new Map(products.map(p => [p.id, p]));
-    res.json(rows.map(r => ({ product: map.get(r.productId), totalOut: r._sum.quantity })));
+    const from = qp.from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const to = qp.to ?? new Date();
+    const rows = await client_1.prisma.$queryRaw `
+    SELECT
+      sm."productId" AS product_id,
+      SUM(sm.quantity) AS total_out,
+      p.name AS product_name,
+      p.sku  AS product_sku
+    FROM "StockMovement" sm
+    JOIN "Product" p
+      ON p.id = sm."productId"
+     AND p."tenantId" = sm."tenantId"
+    WHERE sm."tenantId" = ${req.user.tenantId}
+      AND sm.type = 'OUT'
+      AND sm."createdAt" >= ${from}
+      AND sm."createdAt" <= ${to}
+    GROUP BY sm."productId", p.name, p.sku
+    ORDER BY total_out ASC
+    LIMIT ${qp.limit}
+  `;
+    // Observação: produtos com zero absoluto não aparecem. Para incluí-los, é preciso LEFT JOIN em Product e COALESCE(SUM,0).
+    res.json(rows.map(r => ({
+        product: { id: r.product_id, name: r.product_name, sku: r.product_sku },
+        totalOut: r.total_out?.toString?.() ?? String(r.total_out),
+    })));
 });
 //# sourceMappingURL=routes.js.map

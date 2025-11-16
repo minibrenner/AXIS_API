@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HttpError = exports.ErrorCodes = void 0;
+exports.BadRequest = exports.HttpError = exports.ErrorCodes = void 0;
 exports.isHttpError = isHttpError;
 exports.buildErrorBody = buildErrorBody;
 exports.normalizeError = normalizeError;
@@ -52,6 +52,21 @@ class HttpError extends Error {
     }
 }
 exports.HttpError = HttpError;
+class BadRequest extends HttpError {
+    constructor(payload) {
+        const normalized = typeof payload === "string"
+            ? { message: payload }
+            : payload;
+        super({
+            status: 400,
+            code: exports.ErrorCodes.BAD_REQUEST,
+            message: normalized.message ?? "Requisi\u00e7\u00e3o inv\u00e1lida.",
+            details: normalized.details,
+            errors: normalized.errors,
+        });
+    }
+}
+exports.BadRequest = BadRequest;
 function isHttpError(error) {
     return error instanceof HttpError;
 }

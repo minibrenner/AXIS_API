@@ -14,9 +14,6 @@ enum Role {
   OWNER
 }
 
-
-
-
 model Tenant {
   id          String     @id @default(cuid())
   name        String     @unique
@@ -140,76 +137,72 @@ model Supplier {
   @@map("fornecedores")
 }
 
-
 // --------------------- BD CATEGORIAS PRODUTOS ---------------------
 
 enum Unit {
-  UN  // unidade
-  CX  // caixa
-  KG  // quilograma
-  LT  // litro
+  UN // unidade
+  CX // caixa
+  KG // quilograma
+  LT // litro
   GR // grama 
   ML // mililitro
   PC // Pacote ou PeÃ§a
 }
 
-
 model Product {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   supplierId  String?
   supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   categoryId  String?
   category    Category? @relation(fields: [categoryId], references: [id])
   name        String
   sku         String    @default("")
-  minQuantity Decimal?  @db.Decimal(14,3)
+  minQuantity Decimal?  @db.Decimal(14, 3)
   barcode     String?
   unit        Unit      @default(UN)
-  price       Decimal   @db.Decimal(10,2)
-  cost        Decimal?  @db.Decimal(10,2)
-  minStock    Decimal?  @db.Decimal(14,3)
+  price       Decimal   @db.Decimal(10, 2)
+  cost        Decimal?  @db.Decimal(10, 2)
+  minStock    Decimal?  @db.Decimal(14, 3)
   isActive    Boolean   @default(true)
 
   // Campos fiscais (preparaÃ§Ã£o p/ fases futuras)
-  ncm         String?
-  cest        String?
-  csosn       String?
-  cfop        String?
+  ncm   String?
+  cest  String?
+  csosn String?
+  cfop  String?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   inventories    Inventory[]
   stockMovements StockMovement[]
   purchaseItems  PurchaseItem[]
 
+  @@unique([tenantId, sku]) // SKU Ãºnico por tenant
+  @@unique([tenantId, barcode]) // se quiser permitir repetiÃ§Ã£o, remova esta e mantenha apenas @@index
   @@index([tenantId, name])
   @@index([tenantId, barcode])
-  @@unique([tenantId, sku])         // SKU Ãºnico por tenant
-  @@unique([tenantId, barcode])     // se quiser permitir repetiÃ§Ã£o, remova esta e mantenha apenas @@index
 }
-
 
 model Category {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   products  Product[]
 
-  @@index([tenantId, name])
   @@unique([tenantId, name]) // evita duplicidade por tenant
+  @@index([tenantId, name])
 }
-
 
 model StockLocation {
   id        String   @id @default(cuid())
   tenantId  String
-  name      String   // ex.: "BalcÃ£o", "Cozinha", "DepÃ³sito"
+  name      String // ex.: "BalcÃ£o", "Cozinha", "DepÃ³sito"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -220,26 +213,24 @@ model StockLocation {
   @@unique([tenantId, name]) // evita duplicidade por tenant
 }
 
-
 model Inventory {
-  id            String        @id @default(cuid())
-  tenantId      String
-  productId     String
-  locationId    String
-  quantity      Decimal       @db.Decimal(14,3) @default(0)
+  id         String  @id @default(cuid())
+  tenantId   String
+  productId  String
+  locationId String
+  quantity   Decimal @default(0) @db.Decimal(14, 3)
 
-  minQuantity   Decimal?      @db.Decimal(14,3) // <- ADICIONE: mínimo por local
-  version       Int           @default(0)
-  updatedAt     DateTime      @updatedAt
+  minQuantity Decimal? @db.Decimal(14, 3) // <- ADICIONE: mínimo por local
+  version     Int      @default(0)
+  updatedAt   DateTime @updatedAt
 
-  product       Product       @relation(fields: [productId], references: [id])
-  location      StockLocation @relation(fields: [locationId], references: [id])
+  product  Product       @relation(fields: [productId], references: [id])
+  location StockLocation @relation(fields: [locationId], references: [id])
 
   @@unique([tenantId, productId, locationId])
   @@index([tenantId, locationId])
   @@index([tenantId, productId])
 }
-
 
 enum MovementType {
   IN
@@ -250,80 +241,261 @@ enum MovementType {
 }
 
 model StockMovement {
-  id          String        @id @default(cuid())
-  tenantId    String
-  productId   String
-  locationId  String
-  type        MovementType
-  quantity    Decimal       @db.Decimal(14,3) // IN(+), OUT(-), ADJUST(+/-)
-  reason      String?
-  refId       String?       // id da venda/compra/ajuste
-  diffJson    String?
-  createdBy   String?       // userId
-  createdAt   DateTime      @default(now())
+  id             String       @id @default(cuid())
+  tenantId       String
+  productId      String
+  locationId     String
+  type           MovementType
+  quantity       Decimal      @db.Decimal(14, 3) // IN(+), OUT(-), ADJUST(+/-)
+  reason         String?
+  refId          String? // id da venda/compra/ajuste
+  diffJson       String?
+  createdBy      String? // userId
+  createdAt      DateTime     @default(now())
   beforeQuantity String? // snapshot antes
   afterQuantity  String? // snapshot depois
-  oversell       Boolean @default(false)
+  oversell       Boolean      @default(false)
 
-  product     Product       @relation(fields: [productId], references: [id])
-  location    StockLocation @relation(fields: [locationId], references: [id])
+  product  Product       @relation(fields: [productId], references: [id])
+  location StockLocation @relation(fields: [locationId], references: [id])
 
   @@index([tenantId, type, createdAt, productId], name: "idx_sm_tenant_type_created_product")
   @@index([tenantId, productId, createdAt])
   @@index([tenantId, locationId, createdAt])
 }
 
-
 model Purchase {
-  id          String      @id @default(cuid())
-  tenantId    String
-  supplier    String?
-  invoiceNo   String?
-  total       Decimal?    @db.Decimal(12,2)
-  createdBy   String?
-  createdAt   DateTime    @default(now())
-  items       PurchaseItem[]
+  id        String         @id @default(cuid())
+  tenantId  String
+  supplier  String?
+  invoiceNo String?
+  total     Decimal?       @db.Decimal(12, 2)
+  createdBy String?
+  createdAt DateTime       @default(now())
+  items     PurchaseItem[]
 }
 
-
 model PurchaseItem {
-  id          String   @id @default(cuid())
-  tenantId    String
-  purchaseId  String
-  productId   String
-  locationId  String
-  quantity    Decimal  @db.Decimal(14,3)
-  cost        Decimal? @db.Decimal(10,2)
+  id         String   @id @default(cuid())
+  tenantId   String
+  purchaseId String
+  productId  String
+  locationId String
+  quantity   Decimal  @db.Decimal(14, 3)
+  cost       Decimal? @db.Decimal(10, 2)
 
-  purchase    Purchase @relation(fields: [purchaseId], references: [id])
-  product     Product  @relation(fields: [productId], references: [id])
-  location    StockLocation @relation(fields: [locationId], references: [id])
+  purchase Purchase      @relation(fields: [purchaseId], references: [id])
+  product  Product       @relation(fields: [productId], references: [id])
+  location StockLocation @relation(fields: [locationId], references: [id])
 
   @@index([tenantId, productId])
 }
 
-
 //------------------------- VENDAS -----------------------------------
 
-model ProcessedSale {
-  id              String   @id @default(cuid())
-  tenantId        String
-  saleId          String
-  deviceId        String?
-  clientCreatedAt DateTime?
-  status          SaleStatus @default(PENDING) // PENDING | DONE | ERROR
-  errorMessage    String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-
-  @@unique([tenantId, saleId], name: "tenantId_saleId")
-  @@unique([tenantId, type, refId], name: "uniq_movement_by_ref")
-
+enum SaleStatus {
+  OPEN
+  FINALIZED
+  CANCELED
 }
 
-enum SaleStatus {
+enum PayMethod {
+  cash
+  debit
+  credit
+  pix
+  vr
+  va
+  store_credit
+}
+
+enum DiscountMode {
+  NONE
+  VALUE
+  PERCENT
+}
+
+enum FiscalStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum ProcessedSaleStatus {
   PENDING
   DONE
   ERROR
 }
 
+enum PrintJobType {
+  SALE_RECEIPT
+  CASH_CLOSING
+}
+
+enum PrintJobStatus {
+  PENDING
+  PRINTING
+  DONE
+  FAILED
+}
+
+enum CashApprovalMethod {
+  PIN
+  PASSWORD
+}
+
+model Sale {
+  id             String          @id @default(cuid())
+  tenantId       String
+  userId         String
+  cashSessionId  String
+  cashSession    CashSession     @relation(fields: [cashSessionId], references: [id])
+  number         Int
+  status         SaleStatus
+  subtotalCents  Int
+  discountCents  Int             @default(0)
+  discountMode   DiscountMode    @default(NONE)
+  totalCents     Int
+  changeCents    Int             @default(0)
+  fiscalMode     String // 'sat' | 'nfce' | 'none'
+  fiscalKey      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  items          SaleItem[]
+  payments       Payment[]
+  fiscalDocument FiscalDocument?
+  printJobs      PrintJob[]
+
+  @@unique([tenantId, number]) // numeração única por tenant
+  @@index([tenantId, createdAt])
+}
+
+model SaleItem {
+  id             String       @id @default(cuid())
+  saleId         String
+  productId      String
+  sku            String?
+  name           String
+  qty            Decimal      @db.Decimal(10, 3)
+  unitPriceCents Int
+  totalCents     Int
+  discountCents  Int          @default(0)
+  discountMode   DiscountMode @default(NONE)
+  createdAt      DateTime     @default(now())
+  sale           Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+}
+
+model Payment {
+  id          String    @id @default(cuid())
+  saleId      String
+  method      PayMethod
+  amountCents Int
+  providerId  String?
+  createdAt   DateTime  @default(now())
+  sale        Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+}
+
+model FiscalDocument {
+  id            String       @id @default(cuid())
+  tenantId      String
+  saleId        String       @unique
+  mode          String
+  status        FiscalStatus @default(PENDING)
+  fiscalKey     String?
+  attempts      Int          @default(0)
+  lastAttemptAt DateTime?
+  lastError     String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  sale          Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+}
+
+model CashSession {
+  id                    String              @id @default(cuid())
+  tenantId              String
+  userId                String
+  openedAt              DateTime            @default(now())
+  closedAt              DateTime?
+  openingCents          Int
+  closingCents          Int?
+  notes                 String?
+  createdAt             DateTime            @default(now())
+  closedByUserId        String?
+  closingSupervisorId   String?
+  closingSupervisorRole Role?
+  closingApprovalVia    CashApprovalMethod?
+  closingSnapshot       Json?
+  closingNotes          String?
+  withdrawals           CashWithdrawal[]
+  sales                 Sale[]
+  printJobs             PrintJob[]
+
+  @@unique([tenantId, userId, openedAt]) // evita duplicidade por erro de rede
+  @@index([tenantId, userId, openedAt])
+}
+
+model CashWithdrawal {
+  id            String   @id @default(cuid())
+  tenantId      String
+  cashSessionId String
+  amountCents   Int
+  reason        String
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  cashSession CashSession @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, cashSessionId])
+}
+
+model SaleCounter {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  next      Int      @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+model ProcessedSale {
+  id              String              @id @default(cuid())
+  tenantId        String
+  saleId          String
+  deviceId        String?
+  clientCreatedAt DateTime?
+  status          ProcessedSaleStatus @default(PENDING)
+  errorMessage    String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([tenantId, saleId])
+  @@index([tenantId, status])
+}
+
+model PrintJob {
+  id            String         @id @default(cuid())
+  tenantId      String
+  type          PrintJobType
+  status        PrintJobStatus @default(PENDING)
+  payload       Json
+  source        String?
+  requestedById String?
+  deviceId      String?
+  cashSessionId String?
+  saleId        String?
+  attempts      Int            @default(0)
+  lastError     String?
+  queuedAt      DateTime       @default(now())
+  processedAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  cashSession CashSession? @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  sale        Sale?        @relation(fields: [saleId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, type])
+}

@@ -1,13 +1,10 @@
 // apps/api/src/products/routes.ts
 import { Router } from "express";
-import { jwtAuth } from "../auth/middleware";
 import { withZod } from "../utils/zodMiddleware";
 import { createProductSchema, updateProductSchema } from "./dto";
 import { listProducts, createProduct, updateProduct, softDeleteProduct, getProduct } from "./service";
 
 export const productsRouter = Router();
-
-productsRouter.use(jwtAuth());
 
 productsRouter.get("/", async (req, res) => {
   const q = (req.query.q as string | undefined) ?? undefined;

@@ -7,7 +7,28 @@ const tenant_context_1 = require("../tenancy/tenant.context");
  * Lista dos modelos que precisam ser isolados por tenant.
  * Caso um modelo nao esteja aqui, ele sera ignorado pelo middleware.
  */
-const TENANT_SCOPED_MODELS = new Set(["User", "Session", "AuditLog", "Supplier", "Product"]);
+const DIRECT_TENANT_MODELS = new Set([
+    "User",
+    "Session",
+    "AuditLog",
+    "Supplier",
+    "Product",
+    "Category",
+    "StockLocation",
+    "Inventory",
+    "StockMovement",
+    "CashSession",
+    "CashWithdrawal",
+    "Sale",
+    "ProcessedSale",
+    "PrintJob",
+    "FiscalDocument",
+    "SaleCounter",
+]);
+const RELATIONAL_TENANT_MODELS = {
+    Payment: { relation: "sale" },
+    SaleItem: { relation: "sale" },
+};
 /**
  * Garante que o valor recebido seja um objeto simples (record) antes de acessar suas chaves.
  */
@@ -23,6 +44,15 @@ const getOrCreateNestedRecord = (root, key) => {
     }
     const nested = {};
     root[key] = nested;
+    return nested;
+};
+const getOrCreateRelationRecord = (root, relation) => {
+    const existing = root[relation];
+    if (isPlainRecord(existing)) {
+        return existing;
+    }
+    const nested = {};
+    root[relation] = nested;
     return nested;
 };
 /**
@@ -41,7 +71,7 @@ const isBulkWriteAction = (operation) => operation === "updateMany" || operation
 /**
  * Extension multi-tenant do Prisma.
  * 1. Recupera o tenant atual via `TenantContext.get()`.
- * 2. Se o modelo estiver em `TENANT_SCOPED_MODELS`, injeta `tenantId` em `args.where`
+ * 2. Se o modelo estiver em `DIRECT_TENANT_MODELS`, injeta `tenantId` em `args.where`
  *    de qualquer operacao de leitura ou escrita em massa (find*, count, aggregate, groupBy, updateMany, deleteMany).
  * 3. Em operacoes de escrita simples (create, update, upsert) garante que `args.data.tenantId`
  *    esteja preenchido.
@@ -62,7 +92,9 @@ const withTenantExtension = () => client_1.Prisma.defineExtension({
                         throw new Error("Falha na resposta com o servidor");
                     }
                 };
-                if (!TENANT_SCOPED_MODELS.has(model)) {
+                const relationScope = RELATIONAL_TENANT_MODELS[model];
+                const hasDirectTenant = DIRECT_TENANT_MODELS.has(model);
+                if (!hasDirectTenant && !relationScope) {
                     return forwardSafely(args);
                 }
                 const tenantId = tenant_context_1.TenantContext.get();
@@ -81,14 +113,23 @@ const withTenantExtension = () => client_1.Prisma.defineExtension({
                 const addTenantToWhere = () => {
                     const root = ensureArgsRecord();
                     const where = getOrCreateNestedRecord(root, "where");
-                    if (where.tenantId !== tenantId) {
-                        where.tenantId = tenantId;
+                    if (hasDirectTenant) {
+                        if (where.tenantId !== tenantId) {
+                            where.tenantId = tenantId;
+                        }
+                        return;
+                    }
+                    if (relationScope) {
+                        const relationWhere = getOrCreateRelationRecord(where, relationScope.relation);
+                        if (relationWhere.tenantId !== tenantId) {
+                            relationWhere.tenantId = tenantId;
+                        }
                     }
                 };
                 if (isReadAction(operation)) {
                     addTenantToWhere();
                 }
-                if (isSingleWriteAction(operation)) {
+                if (isSingleWriteAction(operation) && hasDirectTenant) {
                     const root = ensureArgsRecord();
                     const data = getOrCreateNestedRecord(root, "data");
                     if (data.tenantId === undefined) {

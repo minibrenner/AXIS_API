@@ -1,19 +1,19 @@
-/* eslint-disable @typescript-eslint/no-namespace */
+﻿/* eslint-disable @typescript-eslint/no-namespace */
 /**
  * Tipagem do Request do Express com multi-tenant + auth JWT.
- * Mantém a segurança de tipos e elimina `any`.
+ * MantǸm a seguran��a de tipos e elimina `any`.
  */
 
 type AuthRole = "ADMIN" | "ATTENDANT" | "OWNER";
 
 type AuthUser = {
-  /** Identificador do usuário (igual ao `sub` do JWT) */
+  /** Identificador do usuǭrio (igual ao `sub` do JWT) */
   userId: string;
 
   /** Identificador do tenant (igual ao `tid` do JWT) */
   tenantId: string;
 
-  /** Papel (Role) do usuário, em CAIXA ALTA conforme enum Prisma */
+  /** Papel (Role) do usuǭrio, em CAIXA ALTA conforme enum Prisma */
   role: AuthRole;
 
   /** Tipo do token (apenas informativo) */
@@ -34,14 +34,21 @@ declare namespace Express {
     tenantId?: string;
 
     /**
-     * Preenchido pelo jwtAuth quando o access token é válido.
+     * Preenchido pelo jwtAuth quando o access token Ǹ vǭlido.
      */
     user?: AuthUser;
 
     /**
-     * Marcador usado nas requisições sem token ao criar o primeiro OWNER do tenant.
+     * Marcador usado nas requisi����es sem token ao criar o primeiro OWNER do tenant.
      */
     isBootstrapOwnerCreation?: boolean;
+
+    /**
+     * Populado quando um token valido do super admin acompanha a requisicao.
+     */
+    superAdmin?: {
+      email: string;
+    };
   }
 }
 /* eslint-enable @typescript-eslint/no-namespace */

@@ -12,6 +12,7 @@ const auth_service_1 = require("./auth.service");
 const jwt_1 = require("./jwt");
 const middleware_1 = require("./middleware");
 const httpErrors_1 = require("../utils/httpErrors");
+const tenant_context_1 = require("../tenancy/tenant.context");
 exports.authRouter = (0, express_1.Router)();
 /**
  * POST /auth/login
@@ -40,7 +41,7 @@ exports.authRouter.post("/login", async (req, res) => {
             message: "Credenciais invalidas.",
         });
     }
-    const tokens = await (0, auth_service_1.issueTokens)({ id: user.id, tenantId: user.tenantId, role: user.role }, req.get("user-agent") ?? "", req.ip);
+    const tokens = await tenant_context_1.TenantContext.run(user.tenantId, () => (0, auth_service_1.issueTokens)({ id: user.id, tenantId: user.tenantId, role: user.role }, req.get("user-agent") ?? "", req.ip));
     return res.json(tokens);
 });
 /**
@@ -78,7 +79,7 @@ exports.authRouter.post("/refresh", async (req, res) => {
         });
     }
     // busca todas as sessoes do usuario (poderia otimizar com expiresAt > now)
-    const sessions = await client_1.prisma.session.findMany({ where: { userId: payload.sub } });
+    const sessions = await tenant_context_1.TenantContext.run(payload.tid, () => client_1.prisma.session.findMany({ where: { userId: payload.sub } }));
     if (!sessions.length) {
         return (0, httpErrors_1.respondWithError)(res, {
             status: 401,
@@ -96,7 +97,7 @@ exports.authRouter.post("/refresh", async (req, res) => {
         });
     }
     // emite novos tokens com o mesmo tenant/role do payload
-    const tokens = await (0, auth_service_1.issueTokens)({ id: payload.sub, tenantId: payload.tid, role: payload.role });
+    const tokens = await tenant_context_1.TenantContext.run(payload.tid, () => (0, auth_service_1.issueTokens)({ id: payload.sub, tenantId: payload.tid, role: payload.role }));
     return res.json(tokens);
 });
 /**
@@ -112,7 +113,7 @@ exports.authRouter.post("/logout", (0, middleware_1.jwtAuth)(false), async (req,
             message: "Nao autenticado.",
         });
     }
-    await (0, auth_service_1.revokeAllUserSessions)(req.user.userId);
+    await tenant_context_1.TenantContext.run(req.user.tenantId, () => (0, auth_service_1.revokeAllUserSessions)(req.user.userId));
     return res.json({ ok: true });
 });
 //# sourceMappingURL=routes.js.map

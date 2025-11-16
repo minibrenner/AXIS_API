@@ -20,7 +20,36 @@ const userSelectSafe = {
   createdAt: true,
   updatedAt: true,
   passwordUpdatedAt: true,
+  pinSupervisor: true,
 } satisfies Prisma.UserSelect;
+
+type SelectedUser = Prisma.UserGetPayload<{ select: typeof userSelectSafe }>;
+
+const toHttpUser = (user: SelectedUser | null) => {
+  if (!user) {
+    return null;
+  }
+
+  const { pinSupervisor, ...rest } = user;
+  return { ...rest, hasSupervisorPin: Boolean(pinSupervisor) };
+};
+
+async function normalizeSupervisorPin(input?: string | null) {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  if (input === null) {
+    return null;
+  }
+
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return argon2.hash(trimmed);
+}
 
 type AuthRole = "ADMIN" | "ATTENDANT" | "OWNER";
 const ALLOWED_ROLES: ReadonlySet<AuthRole> = new Set(["ADMIN", "ATTENDANT", "OWNER"]);
@@ -29,6 +58,44 @@ const ALLOWED_ROLES: ReadonlySet<AuthRole> = new Set(["ADMIN", "ATTENDANT", "OWN
 function normalizeRole(role: unknown): AuthRole {
   const normalized = String(role ?? "").trim().toUpperCase() as AuthRole;
   return ALLOWED_ROLES.has(normalized) ? normalized : "ATTENDANT";
+}
+
+const ROLE_ASSIGNMENT: Record<AuthRole, ReadonlySet<AuthRole>> = {
+  OWNER: new Set<AuthRole>(["OWNER", "ADMIN", "ATTENDANT"]),
+  ADMIN: new Set<AuthRole>(["ADMIN", "ATTENDANT"]),
+  ATTENDANT: new Set<AuthRole>(),
+};
+
+function canAssignRole(creator: AuthRole | undefined, target: AuthRole) {
+  if (!creator) {
+    return false;
+  }
+  const allowed = ROLE_ASSIGNMENT[creator];
+  return allowed?.has(target) ?? false;
+}
+
+function ensureRoleAssignmentPermission(
+  req: Request,
+  res: Response,
+  targetRole: AuthRole,
+  isBootstrap: boolean
+): targetRole is AuthRole {
+  if (isBootstrap) {
+    return true;
+  }
+
+  const creatorRole = req.user?.role;
+  if (!canAssignRole(creatorRole, targetRole)) {
+    respondWithError(res, {
+      status: 403,
+      code: ErrorCodes.FORBIDDEN,
+      message: "Role alvo nao autorizada para o usuario autenticado.",
+      details: { requesterRole: creatorRole ?? "UNKNOWN", targetRole },
+    });
+    return false;
+  }
+
+  return true;
 }
 
 /** Identifica erros conhecidos do Prisma (unicidade, etc.) para respostas amigaveis. */
@@ -73,14 +140,20 @@ export const createUser = async (req: Request, res: Response) => {
   const tenantId = requireTenantId(req, res);
   if (!tenantId) return;
 
-  const { email, password, name, role, isActive, mustChangePassword } = req.body as CreateUserInput;
+  const { email, password, name, role, isActive, mustChangePassword, pinSupervisor } = req.body as CreateUserInput;
   const isBootstrap = req.isBootstrapOwnerCreation === true;
 
   try {
     const passwordHash = await argon2.hash(password);
     const normalizedRole = normalizeRole(isBootstrap ? "OWNER" : role);
+
+    if (!ensureRoleAssignmentPermission(req, res, normalizedRole, isBootstrap)) {
+      return;
+    }
+
     const activeFlag = isBootstrap ? true : isActive ?? true;
     const mustChangePasswordFlag = isBootstrap ? false : mustChangePassword ?? false;
+    const supervisorPin = await normalizeSupervisorPin(pinSupervisor);
 
     const user = await prisma.user.create({
       data: {
@@ -91,6 +164,7 @@ export const createUser = async (req: Request, res: Response) => {
         role: normalizedRole,
         isActive: activeFlag,
         mustChangePassword: mustChangePasswordFlag,
+        ...(supervisorPin !== undefined ? { pinSupervisor: supervisorPin } : {}),
       },
       select: userSelectSafe,
     });
@@ -106,7 +180,7 @@ export const createUser = async (req: Request, res: Response) => {
         });
     }
 
-    return res.status(201).json(user);
+    return res.status(201).json(toHttpUser(user));
   } catch (error: unknown) {
     console.error("Falha ao criar usuario [details]:", toLog(error));
     if (isPrismaKnownError(error) && error.code === "P2002") {
@@ -138,7 +212,7 @@ export const listUsers = async (req: Request, res: Response) => {
     select: userSelectSafe,
   });
 
-  return res.json(users);
+  return res.json(users.map((user) => toHttpUser(user)!));
 };
 
 /**
@@ -163,7 +237,7 @@ export const getUser = async (req: Request, res: Response) => {
     });
   }
 
-  return res.json(user);
+  return res.json(toHttpUser(user));
 };
 
 /**
@@ -175,12 +249,18 @@ export const updateUser = async (req: Request, res: Response) => {
   if (!tenantId) return;
 
   const { id } = req.params;
-  const { email, password, name, role, isActive, mustChangePassword } = req.body as UpdateUserInput;
+  const { email, password, name, role, isActive, mustChangePassword, pinSupervisor } = req.body as UpdateUserInput;
 
   const data: Record<string, unknown> = {};
   if (email !== undefined) data.email = email;
   if (name !== undefined) data.name = name;
-  if (role !== undefined) data.role = normalizeRole(role);
+  if (role !== undefined) {
+    const normalizedRole = normalizeRole(role);
+    if (!ensureRoleAssignmentPermission(req, res, normalizedRole, false)) {
+      return;
+    }
+    data.role = normalizedRole;
+  }
   if (isActive !== undefined) data.isActive = isActive;
   if (mustChangePassword !== undefined) data.mustChangePassword = mustChangePassword;
 
@@ -190,6 +270,11 @@ export const updateUser = async (req: Request, res: Response) => {
     if (mustChangePassword === undefined) {
       data.mustChangePassword = false;
     }
+  }
+
+  const supervisorPin = await normalizeSupervisorPin(pinSupervisor ?? undefined);
+  if (supervisorPin !== undefined) {
+    data.pinSupervisor = supervisorPin;
   }
 
   try {
@@ -211,7 +296,7 @@ export const updateUser = async (req: Request, res: Response) => {
       select: userSelectSafe,
     });
 
-    return res.json(updated);
+    return res.json(toHttpUser(updated));
   } catch (error: unknown) {
     console.error("Falha ao atualizar usuario [details]:", toLog(error));
     if (isPrismaKnownError(error) && error.code === "P2002") {

@@ -72,6 +72,31 @@ export class HttpError extends Error {
   }
 }
 
+type BadRequestPayload =
+  | string
+  | {
+      message?: string;
+      details?: unknown;
+      errors?: FieldError[];
+    };
+
+export class BadRequest extends HttpError {
+  constructor(payload: BadRequestPayload) {
+    const normalized =
+      typeof payload === "string"
+        ? { message: payload }
+        : payload;
+
+    super({
+      status: 400,
+      code: ErrorCodes.BAD_REQUEST,
+      message: normalized.message ?? "Requisi\u00e7\u00e3o inv\u00e1lida.",
+      details: normalized.details,
+      errors: normalized.errors,
+    });
+  }
+}
+
 export function isHttpError(error: unknown): error is HttpError {
   return error instanceof HttpError;
 }

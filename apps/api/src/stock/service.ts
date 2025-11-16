@@ -2,7 +2,34 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma/client";
 
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
+async function lockInventory(tx: TxClient, tenantId: string, productId: string, locationId: string) {
+  await tx.$executeRawUnsafe(
+    `SELECT id FROM "Inventory" WHERE "tenantId"=$1 AND "productId"=$2 AND "locationId"=$3 FOR UPDATE`,
+    tenantId,
+    productId,
+    locationId,
+  );
+
+  const inv = await tx.inventory.findUnique({
+    where: { tenantId_productId_locationId: { tenantId, productId, locationId } },
+  });
+
+  if (!inv) {
+    throw new Error("Inventario inexistente");
+  }
+
+  return inv;
+}
+
+type StockOperationResult = {
+  inventoryId: string;
+  productId: string;
+  locationId: string;
+  quantity: Prisma.Decimal;
+  wentNegative: boolean;
+};
 
 type StockMovementBase = {
   tenantId: string;
@@ -17,47 +44,72 @@ type StockOutInput = StockMovementBase & {
   saleId?: string;
 };
 
-export async function stockIn({ tenantId, productId, locationId, qty, reason, userId }: StockMovementBase) {
+const toResult = (inv: { id: string; productId: string; locationId: string }, quantity: Prisma.Decimal) => ({
+  inventoryId: inv.id,
+  productId: inv.productId,
+  locationId: inv.locationId,
+  quantity,
+  wentNegative: quantity.isNegative(),
+});
+
+export async function stockIn({
+  tenantId,
+  productId,
+  locationId,
+  qty,
+  reason,
+  userId,
+}: StockMovementBase): Promise<StockOperationResult> {
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(
-      `SELECT id FROM "Inventory" WHERE "tenantId"=$1 AND "productId"=$2 AND "locationId"=$3 FOR UPDATE`,
-      tenantId, productId, locationId
-    );
-    const inv = await tx.inventory.findUnique({ where: { tenantId_productId_locationId: { tenantId, productId, locationId } } });
-    if (!inv) throw new Error("Inventário inexistente");
+    const inv = await lockInventory(tx, tenantId, productId, locationId);
     const newQty = new Prisma.Decimal(inv.quantity).plus(qty);
     await tx.inventory.update({ where: { id: inv.id }, data: { quantity: newQty } });
-    await tx.stockMovement.create({ data: { tenantId, productId, locationId, type: "IN", quantity: qty, reason, createdBy: userId } });
+    await tx.stockMovement.create({
+      data: { tenantId, productId, locationId, type: "IN", quantity: qty, reason, createdBy: userId },
+    });
+
+    return toResult(inv, newQty);
   });
 }
 
-export async function stockOut({ tenantId, productId, locationId, qty, reason, userId, saleId }: StockOutInput) {
+export async function stockOut({
+  tenantId,
+  productId,
+  locationId,
+  qty,
+  reason,
+  userId,
+  saleId,
+}: StockOutInput): Promise<StockOperationResult> {
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(
-      `SELECT id FROM "Inventory" WHERE "tenantId"=$1 AND "productId"=$2 AND "locationId"=$3 FOR UPDATE`,
-      tenantId, productId, locationId
-    );
-    const inv = await tx.inventory.findUnique({ where: { tenantId_productId_locationId: { tenantId, productId, locationId } } });
-    if (!inv) throw new Error("Inventário inexistente");
+    const inv = await lockInventory(tx, tenantId, productId, locationId);
     const newQty = new Prisma.Decimal(inv.quantity).minus(qty);
-    if (newQty.isNegative()) throw new Error("Estoque insuficiente");
     await tx.inventory.update({ where: { id: inv.id }, data: { quantity: newQty } });
-    await tx.stockMovement.create({ data: { tenantId, productId, locationId, type: "OUT", quantity: qty, reason, refId: saleId, createdBy: userId } });
+    await tx.stockMovement.create({
+      data: { tenantId, productId, locationId, type: "OUT", quantity: qty, reason, refId: saleId, createdBy: userId },
+    });
+
+    return toResult(inv, newQty);
   });
 }
 
-export async function stockAdjust({ tenantId, productId, locationId, qty, reason, userId }: StockMovementBase) {
+export async function stockAdjust({
+  tenantId,
+  productId,
+  locationId,
+  qty,
+  reason,
+  userId,
+}: StockMovementBase): Promise<StockOperationResult> {
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(
-      `SELECT id FROM "Inventory" WHERE "tenantId"=$1 AND "productId"=$2 AND "locationId"=$3 FOR UPDATE`,
-      tenantId, productId, locationId
-    );
-    const inv = await tx.inventory.findUnique({ where: { tenantId_productId_locationId: { tenantId, productId, locationId } } });
-    if (!inv) throw new Error("Inventário inexistente");
-    const newQty = new Prisma.Decimal(inv.quantity).plus(qty); // qty pode ser + ou -
-    if (newQty.isNegative()) throw new Error("Estoque ficaria negativo");
+    const inv = await lockInventory(tx, tenantId, productId, locationId);
+    const newQty = new Prisma.Decimal(inv.quantity).plus(qty);
     await tx.inventory.update({ where: { id: inv.id }, data: { quantity: newQty } });
-    await tx.stockMovement.create({ data: { tenantId, productId, locationId, type: "ADJUST", quantity: qty, reason, createdBy: userId } });
+    await tx.stockMovement.create({
+      data: { tenantId, productId, locationId, type: "ADJUST", quantity: qty, reason, createdBy: userId },
+    });
+
+    return toResult(inv, newQty);
   });
 }
 
@@ -81,9 +133,10 @@ export async function listStockMovements(tenantId: string, productId?: string, l
     },
     orderBy: { createdAt: "desc" },
   });
-}   
+}
+
 export async function getStockLevel(tenantId: string, productId: string, locationId: string) {
-  const inv =  await prisma.inventory.findUnique({
+  const inv = await prisma.inventory.findUnique({
     where: { tenantId_productId_locationId: { tenantId, productId, locationId } },
   });
   return inv ? inv.quantity : new Prisma.Decimal(0);
@@ -94,5 +147,42 @@ export async function initializeInventory(tenantId: string, productId: string, l
     where: { tenantId_productId_locationId: { tenantId, productId, locationId } },
     create: { tenantId, productId, locationId, quantity: new Prisma.Decimal(0) },
     update: {},
+  });
+}
+
+export async function cancelSale({ tenantId, saleId, userId }: { tenantId: string; saleId: string; userId?: string }) {
+  const outs = await prisma.stockMovement.findMany({
+    where: { tenantId, refId: saleId, type: "OUT" },
+  });
+
+  if (outs.length === 0) {
+    return { ok: true, nothing: true };
+  }
+
+  return prisma.$transaction(async (tx) => {
+    for (const movement of outs) {
+      const inv = await lockInventory(tx, tenantId, movement.productId, movement.locationId);
+      const newQty = new Prisma.Decimal(inv.quantity).plus(movement.quantity);
+
+      await tx.inventory.update({
+        where: { id: inv.id },
+        data: { quantity: newQty },
+      });
+
+      await tx.stockMovement.create({
+        data: {
+          tenantId,
+          productId: movement.productId,
+          locationId: movement.locationId,
+          type: "CANCEL",
+          quantity: movement.quantity,
+          refId: saleId,
+          reason: "Cancelamento",
+          createdBy: userId,
+        },
+      });
+    }
+
+    return { ok: true };
   });
 }

@@ -13,6 +13,11 @@ const roleInput = zod_1.z
     zod_1.z.string().trim().transform((value) => value.toUpperCase()),
 ])
     .pipe(roleEnum);
+const pinSchema = zod_1.z
+    .string()
+    .trim()
+    .min(4, "pinSupervisor minimo 4 caracteres")
+    .max(32, "pinSupervisor maximo 32 caracteres");
 // Payload aceito na criacao de usuarios: campos obrigatorios + flags opcionais.
 exports.createUserSchema = zod_1.z.object({
     email: zod_1.z.string().email("email invalido"),
@@ -21,6 +26,7 @@ exports.createUserSchema = zod_1.z.object({
     role: roleInput.optional(),
     isActive: zod_1.z.boolean().optional(),
     mustChangePassword: zod_1.z.boolean().optional(),
+    pinSupervisor: pinSchema.optional(),
 });
 // Payload aceito em atualizacoes: todos os campos opcionais para PATCH-like.
 exports.updateUserSchema = zod_1.z.object({
@@ -30,5 +36,6 @@ exports.updateUserSchema = zod_1.z.object({
     role: roleInput.optional(),
     isActive: zod_1.z.boolean().optional(),
     mustChangePassword: zod_1.z.boolean().optional(),
+    pinSupervisor: pinSchema.optional().nullable(),
 });
 //# sourceMappingURL=user.schemas.js.map

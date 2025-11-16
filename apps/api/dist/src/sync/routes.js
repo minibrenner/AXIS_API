@@ -26,7 +26,7 @@ exports.syncRouter.post("/sale", async (req, res) => {
                 saleId,
                 deviceId,
                 clientCreatedAt: createdAt ?? null,
-                status: "PENDING"
+                status: client_1.ProcessedSaleStatus.PENDING
             }
         });
     }
@@ -36,7 +36,7 @@ exports.syncRouter.post("/sale", async (req, res) => {
                 where: { tenantId_saleId: { tenantId, saleId } },
                 select: { status: true }
             });
-            return res.json({ ok: true, alreadyProcessed: true, status: existing?.status ?? "DONE" });
+            return res.json({ ok: true, alreadyProcessed: true, status: existing?.status ?? client_1.ProcessedSaleStatus.DONE });
         }
         throw e;
     }
@@ -126,7 +126,7 @@ exports.syncRouter.post("/sale", async (req, res) => {
             // marca DONE
             await tx.processedSale.update({
                 where: { tenantId_saleId: { tenantId, saleId } },
-                data: { status: "DONE" }
+                data: { status: client_1.ProcessedSaleStatus.DONE }
             });
             return { deficits, itemsApplied: pack.length };
         });
@@ -139,7 +139,7 @@ exports.syncRouter.post("/sale", async (req, res) => {
         try {
             await client_2.prisma.processedSale.update({
                 where: { tenantId_saleId: { tenantId, saleId } },
-                data: { status: "ERROR", errorMessage: message }
+                data: { status: client_1.ProcessedSaleStatus.ERROR, errorMessage: message }
             });
         }
         catch (updateError) {

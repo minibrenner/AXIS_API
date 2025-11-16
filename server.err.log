@@ -1,0 +1,75 @@
+Falha ao criar usuario [details]: {
+  name: 'Error',
+  message: 'Falha na resposta com o servidor',
+  stack: 'Error: Falha na resposta com o servidor\n' +
+    '    at forwardSafely (C:\\AXIS\\apps\\api\\src\\prisma\\withTenantExtension.ts:108:21)\n' +
+    '    at async a (C:\\AXIS\\apps\\api\\node_modules\\.pnpm\\@prisma+client@6.18.0_prism_0052725c552b82a17786ccd4d942bbff\\node_modules\\@prisma\\client\\src\\runtime\\getPrismaClient.ts:833:24)\n' +
+    '    at async createUser (C:\\AXIS\\apps\\api\\src\\modules\\tenant\\controllers\\users.controller.ts:115:18)'
+}
+Falha ao criar usuario [details]: {
+  name: 'Error',
+  message: 'Falha na resposta com o servidor',
+  stack: 'Error: Falha na resposta com o servidor\n' +
+    '    at forwardSafely (C:\\AXIS\\apps\\api\\src\\prisma\\withTenantExtension.ts:108:21)\n' +
+    '    at async a (C:\\AXIS\\apps\\api\\node_modules\\.pnpm\\@prisma+client@6.18.0_prism_0052725c552b82a17786ccd4d942bbff\\node_modules\\@prisma\\client\\src\\runtime\\getPrismaClient.ts:833:24)\n' +
+    '    at async createUser (C:\\AXIS\\apps\\api\\src\\modules\\tenant\\controllers\\users.controller.ts:115:18)'
+}
+Error: Falha na resposta com o servidor
+    at forwardSafely (C:\AXIS\apps\api\src\prisma\withTenantExtension.ts:108:21)
+    at async a (C:\AXIS\apps\api\node_modules\.pnpm\@prisma+client@6.18.0_prism_0052725c552b82a17786ccd4d942bbff\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+    at async <anonymous> (C:\AXIS\apps\api\src\products\rotes.ts:27:19)
+Erro nao tratado: {
+  method: undefined,
+  path: undefined,
+  status: 500,
+  code: 'INTERNAL_SERVER_ERROR',
+  message: 'Erro interno do servidor.',
+  stack: undefined
+}
+TypeError: res.status is not a function
+    at errorHandler (C:\AXIS\apps\api\src\server.ts:37:7)
+    at Layer.handleRequest (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:152:17)
+    at trimPrefix (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:342:13)
+    at C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:297:9
+    at processParams (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:582:12)
+    at next (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:291:5)
+    at C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:688:15
+    at next (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:276:14)
+    at C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:688:15
+    at next (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:276:14)
+ZodError: [
+  {
+    "expected": "string",
+    "code": "invalid_type",
+    "path": [
+      "items",
+      6,
+      "productId"
+    ],
+    "message": "Invalid input: expected string, received null"
+  }
+]
+    at <anonymous> (C:\AXIS\apps\api\src\stock\routes.ts:114:35)
+    at Layer.handleRequest (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:152:17)
+    at next (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\route.js:157:13)
+    at <anonymous> (C:\AXIS\apps\api\src\security\rbac.ts:24:12)
+    at Layer.handleRequest (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:152:17)
+    at next (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\route.js:157:13)
+    at Route.dispatch (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\route.js:117:3)
+    at handle (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:435:11)
+    at Layer.handleRequest (C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:152:17)
+    at C:\AXIS\apps\api\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:295:15
+Error: Falha na resposta com o servidor
+    at forwardSafely (C:\AXIS\apps\api\src\prisma\withTenantExtension.ts:108:21)
+    at async a (C:\AXIS\apps\api\node_modules\.pnpm\@prisma+client@6.18.0_prism_0052725c552b82a17786ccd4d942bbff\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+    at async <anonymous> (C:\AXIS\apps\api\src\stock\routes.ts:109:15)
+Error: Inventario inexistente
+    at lockInventory (C:\AXIS\apps\api\src\stock\service.ts:20:11)
+    at async <anonymous> (C:\AXIS\apps\api\src\stock\service.ts:64:17)
+    at async Proxy._transactionWithCallback (C:\AXIS\apps\api\node_modules\.pnpm\@prisma+client@6.18.0_prism_0052725c552b82a17786ccd4d942bbff\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:722:18)
+    at async <anonymous> (C:\AXIS\apps\api\src\stock\routes.ts:63:18)
+Error: Falha na resposta com o servidor
+    at forwardSafely (C:\AXIS\apps\api\src\prisma\withTenantExtension.ts:108:21)
+    at async a (C:\AXIS\apps\api\node_modules\.pnpm\@prisma+client@6.18.0_prism_0052725c552b82a17786ccd4d942bbff\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+    at async <anonymous> (C:\AXIS\apps\api\src\cash\routes.ts:103:20)
+^C

@@ -40,13 +40,42 @@ function formatUniqueTarget(target) {
     }
     return "dados";
 }
-const resolveTenantUniqueWhere = (identifier) => {
-    const digitsOnly = identifier.replace(/\D/g, "");
+const buildTenantWhereCandidates = (identifier) => {
+    const trimmed = identifier.trim();
+    const digitsOnly = trimmed.replace(/\D/g, "");
+    const candidates = [];
     if (digitsOnly.length === 14) {
-        return { cnpj: digitsOnly };
+        candidates.push({ cnpj: digitsOnly });
     }
-    return { id: identifier };
+    if (digitsOnly.length === 11) {
+        candidates.push({ cpfResLoja: digitsOnly });
+    }
+    if (trimmed) {
+        candidates.push({ id: trimmed });
+        candidates.push({ name: trimmed });
+    }
+    const seen = new Set();
+    return candidates.filter((candidate) => {
+        const key = Object.entries(candidate)
+            .map(([k, v]) => `${k}:${v}`)
+            .join("-");
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
 };
+async function findTenantByIdentifier(identifier) {
+    const candidates = buildTenantWhereCandidates(identifier);
+    for (const where of candidates) {
+        const tenant = await client_2.prisma.tenant.findUnique({ where });
+        if (tenant) {
+            return tenant;
+        }
+    }
+    return null;
+}
 const createTenant = async (req, res) => {
     const payload = (req.body ?? {});
     const { name, email, cnpj, cpfResLoja } = payload;
@@ -130,28 +159,30 @@ const createTenant = async (req, res) => {
 exports.createTenant = createTenant;
 const deleteTenant = async (req, res) => {
     const { identifier } = req.params;
-    try {
-        await client_2.prisma.tenant.delete({
-            where: resolveTenantUniqueWhere(identifier),
-        });
-        return res.status(204).send();
-    }
-    catch (error) {
-        if (isPrismaKnownError(error) && error.code === "P2025") {
+    const candidates = buildTenantWhereCandidates(identifier);
+    for (const where of candidates) {
+        try {
+            await client_2.prisma.tenant.delete({ where });
+            return res.status(204).send();
+        }
+        catch (error) {
+            if (isPrismaKnownError(error) && error.code === "P2025") {
+                continue;
+            }
+            console.error("Falha ao deletar tenant:", toLog(error));
             return (0, httpErrors_1.respondWithError)(res, {
-                status: 404,
-                code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
-                message: "Tenant nao encontrado.",
-                details: { identifier },
+                status: 500,
+                code: httpErrors_1.ErrorCodes.INTERNAL,
+                message: "Falha ao deletar tenant.",
             });
         }
-        console.error("Falha ao deletar tenant:", toLog(error));
-        return (0, httpErrors_1.respondWithError)(res, {
-            status: 500,
-            code: httpErrors_1.ErrorCodes.INTERNAL,
-            message: "Falha ao deletar tenant.",
-        });
     }
+    return (0, httpErrors_1.respondWithError)(res, {
+        status: 404,
+        code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
+        message: "Tenant nao encontrado.",
+        details: { identifier },
+    });
 };
 exports.deleteTenant = deleteTenant;
 const listTenants = async (_req, res) => {
@@ -162,9 +193,7 @@ exports.listTenants = listTenants;
 const getTenant = async (req, res) => {
     const { identifier } = req.params;
     try {
-        const tenant = await client_2.prisma.tenant.findUnique({
-            where: resolveTenantUniqueWhere(identifier),
-        });
+        const tenant = await findTenantByIdentifier(identifier);
         if (!tenant) {
             return (0, httpErrors_1.respondWithError)(res, {
                 status: 404,
@@ -203,40 +232,45 @@ const updateTenant = async (req, res) => {
         data.passwordHash = await bcryptjs_1.default.hash(password, 10);
         data.mustChangePassword = true;
     }
-    try {
-        const tenant = await client_2.prisma.tenant.update({
-            where: resolveTenantUniqueWhere(identifier),
-            data,
-        });
-        return res.json(tenant);
-    }
-    catch (error) {
-        if (isPrismaKnownError(error)) {
-            if (error.code === "P2025") {
-                return (0, httpErrors_1.respondWithError)(res, {
-                    status: 404,
-                    code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
-                    message: "Tenant nao encontrado.",
-                    details: { identifier },
-                });
-            }
-            if (error.code === "P2002") {
-                const target = formatUniqueTarget(error.meta?.target);
-                return (0, httpErrors_1.respondWithError)(res, {
-                    status: 409,
-                    code: httpErrors_1.ErrorCodes.TENANT_CONFLICT,
-                    message: "Ja existe um tenant com os dados fornecidos.",
-                    ...(target ? { details: { target } } : {}),
-                });
-            }
+    const candidates = buildTenantWhereCandidates(identifier);
+    const updatePayload = data;
+    for (const where of candidates) {
+        try {
+            const tenant = await client_2.prisma.tenant.update({
+                where,
+                data: updatePayload,
+            });
+            return res.json(tenant);
         }
-        console.error("Falha ao atualizar tenant:", toLog(error));
-        return (0, httpErrors_1.respondWithError)(res, {
-            status: 500,
-            code: httpErrors_1.ErrorCodes.INTERNAL,
-            message: "Falha ao atualizar tenant.",
-        });
+        catch (error) {
+            if (isPrismaKnownError(error)) {
+                if (error.code === "P2025") {
+                    continue;
+                }
+                if (error.code === "P2002") {
+                    const target = formatUniqueTarget(error.meta?.target);
+                    return (0, httpErrors_1.respondWithError)(res, {
+                        status: 409,
+                        code: httpErrors_1.ErrorCodes.TENANT_CONFLICT,
+                        message: "Ja existe um tenant com os dados fornecidos.",
+                        ...(target ? { details: { target } } : {}),
+                    });
+                }
+            }
+            console.error("Falha ao atualizar tenant:", toLog(error));
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 500,
+                code: httpErrors_1.ErrorCodes.INTERNAL,
+                message: "Falha ao atualizar tenant.",
+            });
+        }
     }
+    return (0, httpErrors_1.respondWithError)(res, {
+        status: 404,
+        code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
+        message: "Tenant nao encontrado.",
+        details: { identifier },
+    });
 };
 exports.updateTenant = updateTenant;
 exports.default = { createTenant: exports.createTenant, deleteTenant: exports.deleteTenant, listTenants: exports.listTenants, getTenant: exports.getTenant, updateTenant: exports.updateTenant };

@@ -6,6 +6,7 @@ import { validateUser, issueTokens, revokeAllUserSessions } from "./auth.service
 import { verifyRefresh } from "./jwt";
 import { jwtAuth } from "./middleware";
 import { ErrorCodes, respondWithError } from "../utils/httpErrors";
+import { TenantContext } from "../tenancy/tenant.context";
 
 export const authRouter = Router();
 
@@ -38,10 +39,12 @@ authRouter.post("/login", async (req, res) => {
     });
   }
 
-  const tokens = await issueTokens(
-    { id: user.id, tenantId: user.tenantId, role: user.role },
-    req.get("user-agent") ?? "",
-    req.ip
+  const tokens = await TenantContext.run(user.tenantId, () =>
+    issueTokens(
+      { id: user.id, tenantId: user.tenantId, role: user.role },
+      req.get("user-agent") ?? "",
+      req.ip
+    )
   );
   return res.json(tokens);
 });
@@ -83,7 +86,9 @@ authRouter.post("/refresh", async (req, res) => {
   }
 
   // busca todas as sessoes do usuario (poderia otimizar com expiresAt > now)
-  const sessions = await prisma.session.findMany({ where: { userId: payload.sub } });
+  const sessions = await TenantContext.run(payload.tid, () =>
+    prisma.session.findMany({ where: { userId: payload.sub } })
+  );
   if (!sessions.length) {
     return respondWithError(res, {
       status: 401,
@@ -106,8 +111,8 @@ authRouter.post("/refresh", async (req, res) => {
   }
 
   // emite novos tokens com o mesmo tenant/role do payload
-  const tokens = await issueTokens(
-    { id: payload.sub, tenantId: payload.tid, role: payload.role }
+  const tokens = await TenantContext.run(payload.tid, () =>
+    issueTokens({ id: payload.sub, tenantId: payload.tid, role: payload.role })
   );
   return res.json(tokens);
 });
@@ -125,6 +130,8 @@ authRouter.post("/logout", jwtAuth(false), async (req, res) => {
       message: "Nao autenticado.",
     });
   }
-  await revokeAllUserSessions(req.user.userId);
+  await TenantContext.run(req.user.tenantId, () =>
+    revokeAllUserSessions(req.user!.userId)
+  );
   return res.json({ ok: true });
 });

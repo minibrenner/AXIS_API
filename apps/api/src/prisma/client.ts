@@ -8,7 +8,7 @@ import { withTenantExtension } from "./withTenantExtension";
 config({ path: path.resolve(__dirname, "../../../.env") });
 
 // cliente compartilhado do Prisma, responsavel por abrir conexoes com o banco de dados
-const basePrisma = new PrismaClient({
+export const basePrisma = new PrismaClient({
   // registra logs detalhados somente em desenvolvimento para facilitar o debug das queries
   log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
 });

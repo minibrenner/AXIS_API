@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { Prisma } from "@prisma/client";
+import { Prisma, ProcessedSaleStatus } from "@prisma/client";
 import { z } from "zod";
 import { jwtAuth } from "../auth/middleware";
 import { prisma } from "../prisma/client";
@@ -20,7 +20,7 @@ type ConsolidatedItem = {
 type TxClient = Omit<typeof prisma, "$extends" | "$connect" | "$disconnect" | "$on" | "$transaction">;
 
 export const syncRouter = Router();
-syncRouter.use(jwtAuth);
+syncRouter.use(jwtAuth());
 
 syncRouter.post("/sale", async (req, res) => {
   const { saleId, items, deviceId, createdAt } = saleSchema.parse(req.body);
@@ -35,7 +35,7 @@ syncRouter.post("/sale", async (req, res) => {
         saleId,
         deviceId,
         clientCreatedAt: createdAt ?? null,
-        status: "PENDING"
+        status: ProcessedSaleStatus.PENDING
       }
     });
   } catch (e: unknown) {
@@ -44,7 +44,7 @@ syncRouter.post("/sale", async (req, res) => {
         where: { tenantId_saleId: { tenantId, saleId } },
         select: { status: true }
       });
-      return res.json({ ok: true, alreadyProcessed: true, status: existing?.status ?? "DONE" });
+      return res.json({ ok: true, alreadyProcessed: true, status: existing?.status ?? ProcessedSaleStatus.DONE });
     }
     throw e;
   }
@@ -154,7 +154,7 @@ syncRouter.post("/sale", async (req, res) => {
       // marca DONE
       await tx.processedSale.update({
         where: { tenantId_saleId: { tenantId, saleId } },
-        data: { status: "DONE" }
+        data: { status: ProcessedSaleStatus.DONE }
       });
 
       return { deficits, itemsApplied: pack.length };
@@ -169,7 +169,7 @@ syncRouter.post("/sale", async (req, res) => {
     try {
       await prisma.processedSale.update({
         where: { tenantId_saleId: { tenantId, saleId } },
-        data: { status: "ERROR", errorMessage: message }
+        data: { status: ProcessedSaleStatus.ERROR, errorMessage: message }
       });
     } catch (updateError) {
       console.error("Failed to mark processedSale as ERROR:", updateError);

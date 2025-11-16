@@ -28,17 +28,14 @@ async function main() {
     },
   });
 
-  const defaultLocation = await prisma.stockLocation.create({
-    data: {
-      tenantId: tenant.id,
-      name: DEFAULT_LOCATION_NAME,
-    },
-  });
-
-  await prisma.tenant.update({
-    where: { id: tenant.id },
-    data: { defaultStockLocationId: defaultLocation.id },
-  });
+  const defaultLocation = await TenantContext.run(tenant.id, () =>
+    prisma.stockLocation.create({
+      data: {
+        tenantId: tenant.id,
+        name: DEFAULT_LOCATION_NAME,
+      },
+    })
+  );
 
   const passwordHash = await argon2.hash(adminPassword);
 

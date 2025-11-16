@@ -23,7 +23,28 @@ const userSelectSafe = {
     createdAt: true,
     updatedAt: true,
     passwordUpdatedAt: true,
+    pinSupervisor: true,
 };
+const toHttpUser = (user) => {
+    if (!user) {
+        return null;
+    }
+    const { pinSupervisor, ...rest } = user;
+    return { ...rest, hasSupervisorPin: Boolean(pinSupervisor) };
+};
+async function normalizeSupervisorPin(input) {
+    if (input === undefined) {
+        return undefined;
+    }
+    if (input === null) {
+        return null;
+    }
+    const trimmed = input.trim();
+    if (!trimmed) {
+        return null;
+    }
+    return argon2_1.default.hash(trimmed);
+}
 const ALLOWED_ROLES = new Set(["ADMIN", "ATTENDANT", "OWNER"]);
 /** Normaliza qualquer role vinda do body para um valor aceito pelo enum da aplicacao. */
 function normalizeRole(role) {
@@ -71,13 +92,14 @@ const createUser = async (req, res) => {
     const tenantId = requireTenantId(req, res);
     if (!tenantId)
         return;
-    const { email, password, name, role, isActive, mustChangePassword } = req.body;
+    const { email, password, name, role, isActive, mustChangePassword, pinSupervisor } = req.body;
     const isBootstrap = req.isBootstrapOwnerCreation === true;
     try {
         const passwordHash = await argon2_1.default.hash(password);
         const normalizedRole = normalizeRole(isBootstrap ? "OWNER" : role);
         const activeFlag = isBootstrap ? true : isActive ?? true;
         const mustChangePasswordFlag = isBootstrap ? false : mustChangePassword ?? false;
+        const supervisorPin = await normalizeSupervisorPin(pinSupervisor);
         const user = await client_2.prisma.user.create({
             data: {
                 tenantId,
@@ -87,6 +109,7 @@ const createUser = async (req, res) => {
                 role: normalizedRole,
                 isActive: activeFlag,
                 mustChangePassword: mustChangePasswordFlag,
+                ...(supervisorPin !== undefined ? { pinSupervisor: supervisorPin } : {}),
             },
             select: userSelectSafe,
         });
@@ -100,7 +123,7 @@ const createUser = async (req, res) => {
                 console.error("Falha ao vincular owner ao tenant:", toLog(error));
             });
         }
-        return res.status(201).json(user);
+        return res.status(201).json(toHttpUser(user));
     }
     catch (error) {
         console.error("Falha ao criar usuario [details]:", toLog(error));
@@ -132,7 +155,7 @@ const listUsers = async (req, res) => {
         where: { tenantId },
         select: userSelectSafe,
     });
-    return res.json(users);
+    return res.json(users.map((user) => toHttpUser(user)));
 };
 exports.listUsers = listUsers;
 /**
@@ -154,7 +177,7 @@ const getUser = async (req, res) => {
             message: "Usuario nao encontrado.",
         });
     }
-    return res.json(user);
+    return res.json(toHttpUser(user));
 };
 exports.getUser = getUser;
 /**
@@ -166,7 +189,7 @@ const updateUser = async (req, res) => {
     if (!tenantId)
         return;
     const { id } = req.params;
-    const { email, password, name, role, isActive, mustChangePassword } = req.body;
+    const { email, password, name, role, isActive, mustChangePassword, pinSupervisor } = req.body;
     const data = {};
     if (email !== undefined)
         data.email = email;
@@ -185,6 +208,10 @@ const updateUser = async (req, res) => {
             data.mustChangePassword = false;
         }
     }
+    const supervisorPin = await normalizeSupervisorPin(pinSupervisor ?? undefined);
+    if (supervisorPin !== undefined) {
+        data.pinSupervisor = supervisorPin;
+    }
     try {
         const result = await client_2.prisma.user.updateMany({
             where: { id, tenantId },
@@ -201,7 +228,7 @@ const updateUser = async (req, res) => {
             where: { id, tenantId },
             select: userSelectSafe,
         });
-        return res.json(updated);
+        return res.json(toHttpUser(updated));
     }
     catch (error) {
         console.error("Falha ao atualizar usuario [details]:", toLog(error));

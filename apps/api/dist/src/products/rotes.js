@@ -3,12 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.productsRouter = void 0;
 // apps/api/src/products/routes.ts
 const express_1 = require("express");
-const middleware_1 = require("../auth/middleware");
 const zodMiddleware_1 = require("../utils/zodMiddleware");
 const dto_1 = require("./dto");
 const service_1 = require("./service");
 exports.productsRouter = (0, express_1.Router)();
-exports.productsRouter.use(middleware_1.jwtAuth);
 exports.productsRouter.get("/", async (req, res) => {
     const q = req.query.q ?? undefined;
     const products = await (0, service_1.listProducts)(req.user.tenantId, q);

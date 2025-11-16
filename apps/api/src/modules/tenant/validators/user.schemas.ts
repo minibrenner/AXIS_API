@@ -13,6 +13,12 @@ const roleInput = z
   ])
   .pipe(roleEnum);
 
+const pinSchema = z
+  .string()
+  .trim()
+  .min(4, "pinSupervisor minimo 4 caracteres")
+  .max(32, "pinSupervisor maximo 32 caracteres");
+
 // Payload aceito na criacao de usuarios: campos obrigatorios + flags opcionais.
 export const createUserSchema = z.object({
   email: z.string().email("email invalido"),
@@ -21,6 +27,7 @@ export const createUserSchema = z.object({
   role: roleInput.optional(),
   isActive: z.boolean().optional(),
   mustChangePassword: z.boolean().optional(),
+  pinSupervisor: pinSchema.optional(),
 });
 
 // Payload aceito em atualizacoes: todos os campos opcionais para PATCH-like.
@@ -31,6 +38,7 @@ export const updateUserSchema = z.object({
   role: roleInput.optional(),
   isActive: z.boolean().optional(),
   mustChangePassword: z.boolean().optional(),
+  pinSupervisor: pinSchema.optional().nullable(),
 });
 
 // Tipos inferidos para evitar repeticao de definitions no controller.

@@ -4,9 +4,7 @@ exports.categoriesRouter = void 0;
 // apps/api/src/categories/routes.ts (resumo)
 const express_1 = require("express");
 const client_1 = require("../prisma/client");
-const middleware_1 = require("../auth/middleware");
 exports.categoriesRouter = (0, express_1.Router)();
-exports.categoriesRouter.use(middleware_1.jwtAuth);
 exports.categoriesRouter.post("/", async (req, res) => {
     const created = await client_1.prisma.category.create({ data: { tenantId: req.user.tenantId, name: req.body.name } });
     res.status(201).json(created);
