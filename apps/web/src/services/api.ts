@@ -1,17 +1,34 @@
-export const API_URL = "http://localhost:3000/api";
-export async function login(email: string, password: string) {
+const apiBase =
+  typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
+    ? String(import.meta.env.VITE_API_URL)
+    : "http://localhost:3000/api";
+
+export const API_URL = apiBase.replace(/\/$/, "");
+
+const defaultHeaders = { "Content-Type": "application/json" } as const;
+
+const readPayload = async <T>(res: Response): Promise<T> => {
+  const raw = await res.text();
+  if (!raw) {
+    return null as T;
+  }
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null as T;
+  }
+};
+
+export type AuthTokens = { access: string; refresh: string };
+
+export async function login(email: string, password: string): Promise<AuthTokens> {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: defaultHeaders,
     body: JSON.stringify({ email, password }),
   });
-  const raw = await res.text();
-  let payload: any = null;
-  try {
-    payload = raw ? JSON.parse(raw) : null;
-  } catch {
-    payload = null;
-  }
+  const payload = await readPayload<AuthTokens & { message?: string }>(res);
+
   if (!res.ok) {
     const details =
       typeof payload?.message === "string"
@@ -22,10 +39,55 @@ export async function login(email: string, password: string) {
   if (!payload) {
     throw new Error("Resposta inesperada da API de login.");
   }
-  return payload as { access: string; refresh: string };
+  return { access: payload.access, refresh: payload.refresh };
 }
+
+export async function fetchCurrentUser(access: string) {
+  const res = await fetch(`${API_URL}/auth/me`, {
+    headers: { Authorization: `Bearer ${access}` },
+  });
+  if (!res.ok) {
+    throw new Error("Não foi possível obter os dados do usuário.");
+  }
+  return res.json();
+}
+
+export async function requestPasswordReset(email: string) {
+  const res = await fetch(`${API_URL}/auth/forgot-password`, {
+    method: "POST",
+    headers: defaultHeaders,
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const payload = await readPayload<{ message?: string }>(res);
+    throw new Error(
+      typeof payload?.message === "string"
+        ? payload.message
+        : "Não foi possível iniciar o reset.",
+    );
+  }
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  const res = await fetch(`${API_URL}/auth/reset-password`, {
+    method: "POST",
+    headers: defaultHeaders,
+    body: JSON.stringify({ token, newPassword }),
+  });
+  if (!res.ok) {
+    const payload = await readPayload<{ message?: string }>(res);
+    throw new Error(
+      typeof payload?.message === "string"
+        ? payload.message
+        : "Não foi possível redefinir a senha.",
+    );
+  }
+}
+
 export async function ping(access: string, tenantId: string) {
-  const res = await fetch(`${API_URL}/ping`, { headers: { "Authorization": `Bearer ${access}`, "x-tenant-id": tenantId } });
+  const res = await fetch(`${API_URL}/ping`, {
+    headers: { Authorization: `Bearer ${access}`, "x-tenant-id": tenantId },
+  });
   if (!res.ok) throw new Error("Ping falhou");
   return res.json();
 }

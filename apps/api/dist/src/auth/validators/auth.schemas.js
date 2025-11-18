@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.refreshSchema = exports.loginSchema = void 0;
+exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.refreshSchema = exports.loginSchema = void 0;
 // apps/api/src/auth/validators/auth.schemas.ts
 const zod_1 = require("zod");
 exports.loginSchema = zod_1.z.object({
@@ -9,5 +9,12 @@ exports.loginSchema = zod_1.z.object({
 });
 exports.refreshSchema = zod_1.z.object({
     refresh: zod_1.z.string().min(10),
+});
+exports.forgotPasswordSchema = zod_1.z.object({
+    email: zod_1.z.string().email(),
+});
+exports.resetPasswordSchema = zod_1.z.object({
+    token: zod_1.z.string().min(10),
+    newPassword: zod_1.z.string().min(8).max(128),
 });
 //# sourceMappingURL=auth.schemas.js.map

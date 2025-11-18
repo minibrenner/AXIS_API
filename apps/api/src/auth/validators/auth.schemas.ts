@@ -9,3 +9,12 @@ export const loginSchema = z.object({
 export const refreshSchema = z.object({
   refresh: z.string().min(10),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(10),
+  newPassword: z.string().min(8).max(128),
+});

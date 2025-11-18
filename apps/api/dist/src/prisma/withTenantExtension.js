@@ -84,14 +84,7 @@ const withTenantExtension = () => client_1.Prisma.defineExtension({
                 if (!model) {
                     throw new Error("Falha na resposta com o servidor");
                 }
-                const forwardSafely = async (finalArgs) => {
-                    try {
-                        return await query(finalArgs);
-                    }
-                    catch {
-                        throw new Error("Falha na resposta com o servidor");
-                    }
-                };
+                const forwardSafely = async (finalArgs) => query(finalArgs);
                 const relationScope = RELATIONAL_TENANT_MODELS[model];
                 const hasDirectTenant = DIRECT_TENANT_MODELS.has(model);
                 if (!hasDirectTenant && !relationScope) {
@@ -131,9 +124,21 @@ const withTenantExtension = () => client_1.Prisma.defineExtension({
                 }
                 if (isSingleWriteAction(operation) && hasDirectTenant) {
                     const root = ensureArgsRecord();
-                    const data = getOrCreateNestedRecord(root, "data");
-                    if (data.tenantId === undefined) {
-                        data.tenantId = tenantId;
+                    if (operation === "upsert") {
+                        const createData = getOrCreateNestedRecord(root, "create");
+                        if (createData.tenantId === undefined) {
+                            createData.tenantId = tenantId;
+                        }
+                        const updateData = getOrCreateNestedRecord(root, "update");
+                        if (updateData.tenantId === undefined) {
+                            updateData.tenantId = tenantId;
+                        }
+                    }
+                    else {
+                        const data = getOrCreateNestedRecord(root, "data");
+                        if (data.tenantId === undefined) {
+                            data.tenantId = tenantId;
+                        }
                     }
                 }
                 if (isBulkWriteAction(operation)) {

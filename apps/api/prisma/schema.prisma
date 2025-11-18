@@ -49,6 +49,7 @@ model User {
   pinSupervisor       String?
   isActive            Boolean   @default(true)
   sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   mustChangePassword  Boolean   @default(false)
@@ -64,6 +65,28 @@ model User {
   @@index([isActive, role])
   @@index([blockedUntil])
 }
+
+
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Hash do token (nunca guarde o token puro)
+  tokenHash String   @unique
+
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+
 
 model Session {
   id        String    @id @default(cuid())

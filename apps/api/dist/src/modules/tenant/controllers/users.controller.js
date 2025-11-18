@@ -51,6 +51,34 @@ function normalizeRole(role) {
     const normalized = String(role ?? "").trim().toUpperCase();
     return ALLOWED_ROLES.has(normalized) ? normalized : "ATTENDANT";
 }
+const ROLE_ASSIGNMENT = {
+    OWNER: new Set(["OWNER", "ADMIN", "ATTENDANT"]),
+    ADMIN: new Set(["ADMIN", "ATTENDANT"]),
+    ATTENDANT: new Set(),
+};
+function canAssignRole(creator, target) {
+    if (!creator) {
+        return false;
+    }
+    const allowed = ROLE_ASSIGNMENT[creator];
+    return allowed?.has(target) ?? false;
+}
+function ensureRoleAssignmentPermission(req, res, targetRole, isBootstrap) {
+    if (isBootstrap) {
+        return true;
+    }
+    const creatorRole = req.user?.role;
+    if (!canAssignRole(creatorRole, targetRole)) {
+        (0, httpErrors_1.respondWithError)(res, {
+            status: 403,
+            code: httpErrors_1.ErrorCodes.FORBIDDEN,
+            message: "Role alvo nao autorizada para o usuario autenticado.",
+            details: { requesterRole: creatorRole ?? "UNKNOWN", targetRole },
+        });
+        return false;
+    }
+    return true;
+}
 /** Identifica erros conhecidos do Prisma (unicidade, etc.) para respostas amigaveis. */
 function isPrismaKnownError(error) {
     return error instanceof client_1.Prisma.PrismaClientKnownRequestError;
@@ -97,6 +125,9 @@ const createUser = async (req, res) => {
     try {
         const passwordHash = await argon2_1.default.hash(password);
         const normalizedRole = normalizeRole(isBootstrap ? "OWNER" : role);
+        if (!ensureRoleAssignmentPermission(req, res, normalizedRole, isBootstrap)) {
+            return;
+        }
         const activeFlag = isBootstrap ? true : isActive ?? true;
         const mustChangePasswordFlag = isBootstrap ? false : mustChangePassword ?? false;
         const supervisorPin = await normalizeSupervisorPin(pinSupervisor);
@@ -195,8 +226,13 @@ const updateUser = async (req, res) => {
         data.email = email;
     if (name !== undefined)
         data.name = name;
-    if (role !== undefined)
-        data.role = normalizeRole(role);
+    if (role !== undefined) {
+        const normalizedRole = normalizeRole(role);
+        if (!ensureRoleAssignmentPermission(req, res, normalizedRole, false)) {
+            return;
+        }
+        data.role = normalizedRole;
+    }
     if (isActive !== undefined)
         data.isActive = isActive;
     if (mustChangePassword !== undefined)

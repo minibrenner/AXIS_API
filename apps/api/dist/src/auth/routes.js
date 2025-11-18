@@ -13,6 +13,10 @@ const jwt_1 = require("./jwt");
 const middleware_1 = require("./middleware");
 const httpErrors_1 = require("../utils/httpErrors");
 const tenant_context_1 = require("../tenancy/tenant.context");
+const validateBody_1 = require("../middlewares/validateBody");
+const auth_schemas_1 = require("./validators/auth.schemas");
+const mailer_1 = require("../utils/mailer");
+const env_1 = require("../config/env");
 exports.authRouter = (0, express_1.Router)();
 /**
  * POST /auth/login
@@ -115,5 +119,55 @@ exports.authRouter.post("/logout", (0, middleware_1.jwtAuth)(false), async (req,
     }
     await tenant_context_1.TenantContext.run(req.user.tenantId, () => (0, auth_service_1.revokeAllUserSessions)(req.user.userId));
     return res.json({ ok: true });
+});
+const genericResetResponse = {
+    message: "Se o e-mail estiver cadastrado, enviaremos instruções para redefinir a senha.",
+};
+/**
+ * POST /auth/forgot-password
+ */
+exports.authRouter.post("/forgot-password", (0, validateBody_1.validateBody)(auth_schemas_1.forgotPasswordSchema), async (req, res) => {
+    const { email } = req.body;
+    const user = await client_1.basePrisma.user.findFirst({
+        where: { email },
+    });
+    if (!user) {
+        return res.json(genericResetResponse);
+    }
+    const rawToken = await (0, auth_service_1.createPasswordResetTokenForUser)(user.id);
+    const baseUrl = env_1.env.APP_WEB_URL.replace(/\/$/, "");
+    const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
+    await (0, mailer_1.sendPasswordResetEmail)({
+        to: user.email,
+        name: user.name ?? user.email,
+        resetUrl,
+    });
+    return res.json(genericResetResponse);
+});
+/**
+ * POST /auth/reset-password
+ */
+exports.authRouter.post("/reset-password", (0, validateBody_1.validateBody)(auth_schemas_1.resetPasswordSchema), async (req, res) => {
+    const { token, newPassword } = req.body;
+    try {
+        await (0, auth_service_1.resetUserPasswordFromToken)(token, newPassword);
+        return res.json({
+            message: "Senha redefinida com sucesso. Faça login novamente.",
+        });
+    }
+    catch (err) {
+        if (err?.message === "TOKEN_INVALID") {
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 400,
+                code: httpErrors_1.ErrorCodes.TOKEN_INVALID,
+                message: "Token inválido ou expirado.",
+            });
+        }
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 500,
+            code: httpErrors_1.ErrorCodes.INTERNAL,
+            message: "Erro ao redefinir a senha.",
+        });
+    }
 });
 //# sourceMappingURL=routes.js.map

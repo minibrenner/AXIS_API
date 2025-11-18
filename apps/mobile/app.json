@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Axis Mobile",
+    "slug": "axis-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/axis-logo.png",
+    "splash": {
+      "image": "./assets/axis-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#020617"
+    },
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/axis-logo.png",
+        "backgroundColor": "#020617"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/axis-logo.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "axis-mobile-placeholder"
+      },
+      "apiUrl": "http://localhost:3000/api"
+    }
+  }
+}

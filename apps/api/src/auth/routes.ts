@@ -1,12 +1,25 @@
 // apps/api/src/auth/routes.ts
 import { Router } from "express";
 import argon2 from "argon2";
-import { prisma } from "../prisma/client";
-import { validateUser, issueTokens, revokeAllUserSessions } from "./auth.service";
+import { basePrisma, prisma } from "../prisma/client";
+import {
+  validateUser,
+  issueTokens,
+  revokeAllUserSessions,
+  createPasswordResetTokenForUser,
+  resetUserPasswordFromToken,
+} from "./auth.service";
 import { verifyRefresh } from "./jwt";
 import { jwtAuth } from "./middleware";
 import { ErrorCodes, respondWithError } from "../utils/httpErrors";
 import { TenantContext } from "../tenancy/tenant.context";
+import { validateBody } from "../middlewares/validateBody";
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from "./validators/auth.schemas";
+import { sendPasswordResetEmail } from "../utils/mailer";
+import { env } from "../config/env";
 
 export const authRouter = Router();
 
@@ -135,3 +148,71 @@ authRouter.post("/logout", jwtAuth(false), async (req, res) => {
   );
   return res.json({ ok: true });
 });
+
+const genericResetResponse = {
+  message: "Se o e-mail estiver cadastrado, enviaremos instruções para redefinir a senha.",
+};
+
+/**
+ * POST /auth/forgot-password
+ */
+authRouter.post(
+  "/forgot-password",
+  validateBody(forgotPasswordSchema),
+  async (req, res) => {
+    const { email } = req.body as { email: string };
+
+    const user = await basePrisma.user.findFirst({
+      where: { email },
+    });
+
+    if (!user) {
+      return res.json(genericResetResponse);
+    }
+
+    const rawToken = await createPasswordResetTokenForUser(user.id);
+    const baseUrl = env.APP_WEB_URL.replace(/\/$/, "");
+    const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
+
+    await sendPasswordResetEmail({
+      to: user.email,
+      name: user.name ?? user.email,
+      resetUrl,
+    });
+
+    return res.json(genericResetResponse);
+  },
+);
+
+/**
+ * POST /auth/reset-password
+ */
+authRouter.post(
+  "/reset-password",
+  validateBody(resetPasswordSchema),
+  async (req, res) => {
+    const { token, newPassword } = req.body as { token: string; newPassword: string };
+
+    try {
+      await resetUserPasswordFromToken(token, newPassword);
+      return res.json({
+        message: "Senha redefinida com sucesso. Faça login novamente.",
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : undefined;
+      if (message === "TOKEN_INVALID") {
+        return respondWithError(res, {
+          status: 400,
+          code: ErrorCodes.TOKEN_INVALID,
+          message: "Token inválido ou expirado.",
+        });
+      }
+
+      return respondWithError(res, {
+        status: 500,
+        code: ErrorCodes.INTERNAL,
+        message: "Erro ao redefinir a senha.",
+      });
+    }
+  },
+);

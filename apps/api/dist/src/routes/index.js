@@ -16,6 +16,10 @@ const routes_5 = __importDefault(require("../stock/routes"));
 const routes_6 = __importDefault(require("../sales/routes"));
 const routes_7 = __importDefault(require("../fiscal/routes"));
 const routes_8 = require("../cash/routes");
+const routes_9 = require("../sync/routes");
+const customers_routes_1 = require("../customers/customers.routes");
+const ledger_routes_1 = require("../customers/ledger.routes");
+const statement_pdf_routes_1 = require("../customers/statement.pdf.routes");
 /**
  * Router raiz da API. Centraliza o registro de todos os sub-routers.
  */
@@ -43,6 +47,10 @@ const secureRoutes = [
     ["/sales", routes_6.default],
     ["/fiscal", routes_7.default],
     ["/cash", routes_8.cashRouter],
+    ["/sync", routes_9.syncRouter],
+    ["/customers", customers_routes_1.customersRouter],
+    ["/customers", ledger_routes_1.ledgerRouter],
+    ["/customers", statement_pdf_routes_1.statementPdfRouter],
 ];
 for (const [prefix, childRouter] of secureRoutes) {
     router.use(prefix, (0, middleware_1.jwtAuth)(false), tenant_middleware_1.tenantMiddleware, childRouter);

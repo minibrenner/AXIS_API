@@ -1,0 +1,19 @@
+{
+  "extends": "@tsconfig/react-native/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "types": ["react-native", "jest"],
+    "skipLibCheck": true,
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "App.tsx"
+  ]
+}
