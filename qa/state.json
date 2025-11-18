@@ -1,95 +1,95 @@
 {
-  "runId": 1763310828115,
+  "runId": 1763321562710,
   "tenant": {
-    "id": "cmi1xqmug00006mh4poc9y280",
-    "name": "QA Tenant qa-1763310828115",
+    "id": "cmi244pqo00006m8gkfh0keos",
+    "name": "QA Tenant qa-1763321562710",
     "cnpj": null,
     "isActive": true,
-    "createdAt": "2025-11-16T16:33:48.328Z",
-    "updatedAt": "2025-11-16T16:33:48.328Z",
+    "createdAt": "2025-11-16T19:32:42.960Z",
+    "updatedAt": "2025-11-16T19:32:42.960Z",
     "cpfResLoja": null,
-    "email": "tenant-qa-1763310828115@axis.test",
+    "email": "tenant-qa-1763321562710@axis.test",
     "ownerUserId": null
   },
   "users": {
     "adminAlpha": {
-      "id": "cmi1xqno600066mh47n5m0p4z",
-      "tenantId": "cmi1xqmug00006mh4poc9y280",
-      "email": "admin-alpha-qa-1763310828115@axis.test",
+      "id": "cmi244qc000066m8g9qqpvbal",
+      "tenantId": "cmi244pqo00006m8gkfh0keos",
+      "email": "admin-alpha-qa-1763321562710@axis.test",
       "name": "QA Admin Alpha",
       "role": "ADMIN",
       "isActive": true,
       "mustChangePassword": false,
-      "createdAt": "2025-11-16T16:33:49.399Z",
-      "updatedAt": "2025-11-16T16:33:49.399Z",
-      "passwordUpdatedAt": "2025-11-16T16:33:49.399Z",
+      "createdAt": "2025-11-16T19:32:43.728Z",
+      "updatedAt": "2025-11-16T19:32:43.728Z",
+      "passwordUpdatedAt": "2025-11-16T19:32:43.728Z",
       "hasSupervisorPin": true
     },
     "adminBeta": {
-      "id": "cmi1xqnqf00086mh4uei8wkkm",
-      "tenantId": "cmi1xqmug00006mh4poc9y280",
-      "email": "admin-beta-qa-1763310828115@axis.test",
+      "id": "cmi244qen00086m8gjidvzwpc",
+      "tenantId": "cmi244pqo00006m8gkfh0keos",
+      "email": "admin-beta-qa-1763321562710@axis.test",
       "name": "QA Admin Beta",
       "role": "ADMIN",
       "isActive": true,
       "mustChangePassword": false,
-      "createdAt": "2025-11-16T16:33:49.479Z",
-      "updatedAt": "2025-11-16T16:33:49.479Z",
-      "passwordUpdatedAt": "2025-11-16T16:33:49.479Z",
+      "createdAt": "2025-11-16T19:32:43.823Z",
+      "updatedAt": "2025-11-16T19:32:43.823Z",
+      "passwordUpdatedAt": "2025-11-16T19:32:43.823Z",
       "hasSupervisorPin": false
     },
     "attendantA": {
-      "id": "cmi1xqnuj000a6mh4gv7n7wlp",
-      "tenantId": "cmi1xqmug00006mh4poc9y280",
-      "email": "attendant-a-qa-1763310828115@axis.test",
+      "id": "cmi244qhs000a6m8gx0gjcr4n",
+      "tenantId": "cmi244pqo00006m8gkfh0keos",
+      "email": "attendant-a-qa-1763321562710@axis.test",
       "name": "QA Attendant A",
       "role": "ATTENDANT",
       "isActive": true,
       "mustChangePassword": false,
-      "createdAt": "2025-11-16T16:33:49.627Z",
-      "updatedAt": "2025-11-16T16:33:49.627Z",
-      "passwordUpdatedAt": "2025-11-16T16:33:49.627Z",
+      "createdAt": "2025-11-16T19:32:43.936Z",
+      "updatedAt": "2025-11-16T19:32:43.936Z",
+      "passwordUpdatedAt": "2025-11-16T19:32:43.936Z",
       "hasSupervisorPin": false
     },
     "attendantB": {
-      "id": "cmi1xqnyo000c6mh4agknd0c8",
-      "tenantId": "cmi1xqmug00006mh4poc9y280",
-      "email": "attendant-b-qa-1763310828115@axis.test",
+      "id": "cmi244qkz000c6m8gp5u8fhvs",
+      "tenantId": "cmi244pqo00006m8gkfh0keos",
+      "email": "attendant-b-qa-1763321562710@axis.test",
       "name": "QA Attendant B",
       "role": "ATTENDANT",
       "isActive": true,
       "mustChangePassword": false,
-      "createdAt": "2025-11-16T16:33:49.776Z",
-      "updatedAt": "2025-11-16T16:33:49.776Z",
-      "passwordUpdatedAt": "2025-11-16T16:33:49.776Z",
+      "createdAt": "2025-11-16T19:32:44.051Z",
+      "updatedAt": "2025-11-16T19:32:44.051Z",
+      "passwordUpdatedAt": "2025-11-16T19:32:44.051Z",
       "hasSupervisorPin": false
     },
     "ownerB": {
-      "id": "cmi1xqo1g000e6mh4ayghrkfq",
-      "tenantId": "cmi1xqmug00006mh4poc9y280",
-      "email": "owner-b-qa-1763310828115@axis.test",
+      "id": "cmi244qoi000e6m8gowwfzk81",
+      "tenantId": "cmi244pqo00006m8gkfh0keos",
+      "email": "owner-b-qa-1763321562710@axis.test",
       "name": "QA Owner B",
       "role": "OWNER",
       "isActive": true,
       "mustChangePassword": false,
-      "createdAt": "2025-11-16T16:33:49.877Z",
-      "updatedAt": "2025-11-16T16:33:49.877Z",
-      "passwordUpdatedAt": "2025-11-16T16:33:49.877Z",
+      "createdAt": "2025-11-16T19:32:44.178Z",
+      "updatedAt": "2025-11-16T19:32:44.178Z",
+      "passwordUpdatedAt": "2025-11-16T19:32:44.178Z",
       "hasSupervisorPin": false
     }
   },
   "sales": [],
   "cashSessions": [
     {
-      "id": "cmi1xqoob003a6mh4rwcoaf1w",
-      "tenantId": "cmi1xqmug00006mh4poc9y280",
-      "userId": "cmi1xqnuj000a6mh4gv7n7wlp",
-      "openedAt": "2025-11-16T16:33:50.700Z",
+      "id": "cmi244rll003a6m8g30tyy6ky",
+      "tenantId": "cmi244pqo00006m8gkfh0keos",
+      "userId": "cmi244qhs000a6m8gx0gjcr4n",
+      "openedAt": "2025-11-16T19:32:45.369Z",
       "closedAt": null,
       "openingCents": 10000,
       "closingCents": null,
       "notes": "Caixa QA Attendant",
-      "createdAt": "2025-11-16T16:33:50.700Z",
+      "createdAt": "2025-11-16T19:32:45.369Z",
       "closedByUserId": null,
       "closingSupervisorId": null,
       "closingSupervisorRole": null,
@@ -97,10 +97,10 @@
       "closingSnapshot": null,
       "closingNotes": null,
       "closing": {
-        "sessionId": "cmi1xqoob003a6mh4rwcoaf1w",
-        "tenantId": "cmi1xqmug00006mh4poc9y280",
-        "openedAt": "2025-11-16T16:33:50.700Z",
-        "closedAt": "2025-11-16T16:33:51.296Z",
+        "sessionId": "cmi244rll003a6m8g30tyy6ky",
+        "tenantId": "cmi244pqo00006m8gkfh0keos",
+        "openedAt": "2025-11-16T19:32:45.369Z",
+        "closedAt": "2025-11-16T19:32:47.722Z",
         "openingCents": 10000,
         "closingCents": 9000,
         "cashSalesCents": 7900,
@@ -113,15 +113,15 @@
         "openingNotes": "Caixa QA Attendant",
         "closingNotes": "Fechamento QA",
         "openedBy": {
-          "id": "cmi1xqnuj000a6mh4gv7n7wlp",
+          "id": "cmi244qhs000a6m8gx0gjcr4n",
           "name": "QA Attendant A"
         },
         "closedBy": {
-          "id": "cmi1xqnuj000a6mh4gv7n7wlp",
+          "id": "cmi244qhs000a6m8gx0gjcr4n",
           "name": "QA Attendant A"
         },
         "approvedBy": {
-          "id": "cmi1xqn2l00026mh4r32xsm89",
+          "id": "cmi244pwm00026m8g257pc711",
           "name": "QA Owner",
           "role": "OWNER",
           "via": "PIN"
@@ -165,12 +165,12 @@
         ],
         "withdrawals": [
           {
-            "id": "cmi1xqozi00466mh4nuad6qm8",
+            "id": "cmi244ska00466m8gg8ot8t7x",
             "amountCents": 1500,
             "reason": "QA retirada",
-            "createdAt": "2025-11-16T16:33:51.103Z",
+            "createdAt": "2025-11-16T19:32:46.618Z",
             "createdBy": {
-              "id": "cmi1xqnuj000a6mh4gv7n7wlp",
+              "id": "cmi244qhs000a6m8gx0gjcr4n",
               "name": "QA Attendant A"
             }
           }
@@ -179,20 +179,20 @@
           "totalCents": 0,
           "entries": []
         },
-        "printJobId": "cmi1xqp56004c6mh4onvype9t",
+        "printJobId": "cmi244tf9004c6m8go48ydels",
         "printJobStatus": "PENDING"
       }
     },
     {
-      "id": "cmi1xqp7t004j6mh4t6syhqvc",
-      "tenantId": "cmi1xqmug00006mh4poc9y280",
-      "userId": "cmi1xqno600066mh47n5m0p4z",
-      "openedAt": "2025-11-16T16:33:51.402Z",
+      "id": "cmi244tim004j6m8gr59m8ss7",
+      "tenantId": "cmi244pqo00006m8gkfh0keos",
+      "userId": "cmi244qc000066m8g9qqpvbal",
+      "openedAt": "2025-11-16T19:32:47.854Z",
       "closedAt": null,
       "openingCents": 5000,
       "closingCents": null,
       "notes": "Caixa Admin QA",
-      "createdAt": "2025-11-16T16:33:51.402Z",
+      "createdAt": "2025-11-16T19:32:47.854Z",
       "closedByUserId": null,
       "closingSupervisorId": null,
       "closingSupervisorRole": null,
@@ -200,10 +200,10 @@
       "closingSnapshot": null,
       "closingNotes": null,
       "closing": {
-        "sessionId": "cmi1xqp7t004j6mh4t6syhqvc",
-        "tenantId": "cmi1xqmug00006mh4poc9y280",
-        "openedAt": "2025-11-16T16:33:51.402Z",
-        "closedAt": "2025-11-16T16:33:51.764Z",
+        "sessionId": "cmi244tim004j6m8gr59m8ss7",
+        "tenantId": "cmi244pqo00006m8gkfh0keos",
+        "openedAt": "2025-11-16T19:32:47.854Z",
+        "closedAt": "2025-11-16T19:32:48.144Z",
         "openingCents": 5000,
         "closingCents": 5000,
         "cashSalesCents": 0,
@@ -216,15 +216,15 @@
         "openingNotes": "Caixa Admin QA",
         "closingNotes": null,
         "openedBy": {
-          "id": "cmi1xqno600066mh47n5m0p4z",
+          "id": "cmi244qc000066m8g9qqpvbal",
           "name": "QA Admin Alpha"
         },
         "closedBy": {
-          "id": "cmi1xqno600066mh47n5m0p4z",
+          "id": "cmi244qc000066m8g9qqpvbal",
           "name": "QA Admin Alpha"
         },
         "approvedBy": {
-          "id": "cmi1xqno600066mh47n5m0p4z",
+          "id": "cmi244qc000066m8g9qqpvbal",
           "name": "QA Admin Alpha",
           "role": "ADMIN",
           "via": "PASSWORD"
@@ -271,7 +271,7 @@
           "totalCents": 0,
           "entries": []
         },
-        "printJobId": "cmi1xqpi5004s6mh4nqgwbrnc",
+        "printJobId": "cmi244tr4004s6m8gjzmqde34",
         "printJobStatus": "PENDING"
       }
     }
@@ -285,102 +285,102 @@
     {
       "title": "Super admin login",
       "status": "passed",
-      "durationMs": 60
+      "durationMs": 73
     },
     {
       "title": "Criar tenant via super admin",
       "status": "passed",
-      "durationMs": 276
+      "durationMs": 195
     },
     {
       "title": "Bootstrap owner",
       "status": "passed",
-      "durationMs": 424
+      "durationMs": 218
     },
     {
       "title": "Login owner",
       "status": "passed",
-      "durationMs": 276
+      "durationMs": 222
     },
     {
       "title": "Validar conflito de email duplicado",
       "status": "passed",
-      "durationMs": 93
+      "durationMs": 118
     },
     {
       "title": "Criar Admin Alpha",
       "status": "passed",
-      "durationMs": 157
+      "durationMs": 192
     },
     {
       "title": "Criar Admin Beta via OWNER",
       "status": "passed",
-      "durationMs": 81
+      "durationMs": 111
     },
     {
       "title": "Criar Attendant A",
       "status": "passed",
-      "durationMs": 150
+      "durationMs": 103
     },
     {
       "title": "Criar Attendant B",
       "status": "passed",
-      "durationMs": 150
+      "durationMs": 128
     },
     {
       "title": "Criar Owner Secundario",
       "status": "passed",
-      "durationMs": 96
+      "durationMs": 125
     },
     {
       "title": "Login Admin Alpha",
       "status": "passed",
-      "durationMs": 161
+      "durationMs": 253
     },
     {
       "title": "Login Attendant A",
       "status": "passed",
-      "durationMs": 160
+      "durationMs": 205
     },
     {
       "title": "Admin promove Attendant A para ADMIN",
       "status": "passed",
-      "durationMs": 9
+      "durationMs": 26
     },
     {
       "title": "Criar estoque/location com ADMIN",
       "status": "passed",
-      "durationMs": 10
+      "durationMs": 17
     },
     {
       "title": "Criar categorias",
       "status": "passed",
-      "durationMs": 21
+      "durationMs": 29
     },
     {
       "title": "Criar produtos",
       "status": "passed",
-      "durationMs": 89
+      "durationMs": 106
     },
     {
       "title": "Editar e excluir produtos",
       "status": "passed",
-      "durationMs": 18
+      "durationMs": 24
     },
     {
       "title": "Normalizar IDs de produtos para UUID",
       "status": "passed",
-      "durationMs": 33
+      "durationMs": 74
     },
     {
       "title": "Preparar inventario inicial",
       "status": "passed",
-      "durationMs": 20
+      "durationMs": 37
     },
     {
       "title": "Inicializar e movimentar estoque",
       "status": "passed",
-      "durationMs": 291
+      "durationMs": 391
     },
     {
       "title": "Abrir caixa (attendant)",
@@ -390,42 +390,42 @@
     {
       "title": "Venda 1 - PIX + DINHEIRO",
       "status": "passed",
-      "durationMs": 118
+      "durationMs": 116
     },
     {
       "title": "Venda 2 - cartoes fracionados",
       "status": "passed",
-      "durationMs": 26
+      "durationMs": 23
     },
     {
       "title": "Evitar duplicidade de venda (idempotency)",
       "status": "passed",
-      "durationMs": 9
+      "durationMs": 7
     },
     {
       "title": "Venda 3 com desconto requerendo PIN",
       "status": "passed",
-      "durationMs": 116
+      "durationMs": 516
     },
     {
       "title": "Gerar recibos das vendas",
       "status": "passed",
-      "durationMs": 53
+      "durationMs": 55
     },
     {
       "title": "Sangria requer PIN",
       "status": "passed",
-      "durationMs": 83
+      "durationMs": 551
     },
     {
       "title": "Cancelar venda e devolver estoque",
       "status": "passed",
-      "durationMs": 106
+      "durationMs": 584
     },
     {
       "title": "Fechar caixa attendant",
       "status": "passed",
-      "durationMs": 106
+      "durationMs": 523
     },
     {
       "title": "Consultar relatorio de caixa encerrado",
@@ -435,27 +435,27 @@
     {
       "title": "Teste de sync sale com idempotencia",
       "status": "passed",
-      "durationMs": 66
+      "durationMs": 90
     },
     {
       "title": "Abrir caixa como ADMIN",
       "status": "passed",
-      "durationMs": 13
+      "durationMs": 32
     },
     {
       "title": "Registrar venda simples como ADMIN",
       "status": "passed",
-      "durationMs": 36
+      "durationMs": 53
     },
     {
       "title": "Fechar caixa admin",
       "status": "passed",
-      "durationMs": 336
+      "durationMs": 242
     },
     {
       "title": "Niveis de estoque apos vendas/cancelamentos",
       "status": "passed",
-      "durationMs": 27
+      "durationMs": 32
     }
   ],
   "syncAvailable": true,

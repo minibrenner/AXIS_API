@@ -30,7 +30,9 @@ model Tenant {
   ownerUserId String?    @unique
   ownerUser   User?      @relation("TenantOwner", fields: [ownerUserId], references: [id])
 
-  categories Category[] // FIX: back-relation obrigatÃ³rio da relaÃ§Ã£o Category.tenant
+  categories Category[] // FIX: back-relation obrigata??rio da relaa??a??o Category.tenant
+  customers Customer[]
+  customerLedgers CustomerLedger[]
 
   @@index([isActive, createdAt])
 }
@@ -498,4 +500,54 @@ model PrintJob {
   sale        Sale?        @relation(fields: [saleId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status, type])
+}
+
+
+model Customer {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  name           String
+  document       String?  // CPF/CNPJ (único por tenant)
+  phone          String?
+  email          String?
+  address        String?
+  allowCredit    Boolean  @default(false)
+  creditLimit    Decimal? @db.Decimal(12,2) // pode ser null = sem limite
+  defaultDueDays Int?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  ledgers        CustomerLedger[]
+
+  @@index([tenantId, name])
+  @@unique([tenantId, document])
+}
+
+enum LedgerType {
+  CHARGE   // Lançamento (compra a prazo)
+  PAYMENT  // Baixa (pagamento do cliente)
+  ADJUST   // Ajuste (crédito ou débito administrativo)
+}
+
+model CustomerLedger {
+  id             String     @id @default(cuid())
+  tenantId       String
+  tenant         Tenant     @relation(fields: [tenantId], references: [id])
+  customerId     String
+  customer       Customer   @relation(fields: [customerId], references: [id])
+  type           LedgerType
+  amount         Decimal    @db.Decimal(12,2) // valor absoluto (sinal pelo type)
+  description    String?
+  saleId         String?
+  dueDate        DateTime?
+  paidAt         DateTime?
+  method         String?    // para PAYMENT
+  idempotencyKey String?    @unique
+  createdBy      String?
+  createdAt      DateTime   @default(now())
+
+  @@index([tenantId, customerId, type, dueDate])
+  @@index([tenantId, createdAt])
 }

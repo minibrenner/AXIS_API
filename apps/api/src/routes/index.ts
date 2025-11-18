@@ -13,6 +13,9 @@ import salesRouter from "../sales/routes";
 import fiscalRouter from "../fiscal/routes";
 import { cashRouter } from "../cash/routes";
 import { syncRouter } from "../sync/routes";
+import { customersRouter } from "../customers/customers.routes";
+import { ledgerRouter } from "../customers/ledger.routes";
+import { statementPdfRouter } from "../customers/statement.pdf.routes";
 
 /**
  * Router raiz da API. Centraliza o registro de todos os sub-routers.
@@ -46,6 +49,9 @@ const secureRoutes: Array<[string, Router]> = [
   ["/fiscal", fiscalRouter],
   ["/cash", cashRouter],
   ["/sync", syncRouter],
+  ["/customers", customersRouter],
+  ["/customers", ledgerRouter],
+  ["/customers", statementPdfRouter],
 ];
 
 for (const [prefix, childRouter] of secureRoutes) {

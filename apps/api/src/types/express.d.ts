@@ -49,6 +49,16 @@ declare namespace Express {
     superAdmin?: {
       email: string;
     };
+
+    /**
+     * Identificador de request usado nos logs/telemetria.
+     */
+    requestId?: string;
+
+    /**
+     * Token de correla��o (propagado via header x-correlation-id).
+     */
+    correlationId?: string;
   }
 }
 /* eslint-enable @typescript-eslint/no-namespace */

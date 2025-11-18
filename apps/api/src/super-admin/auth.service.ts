@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import argon2 from "argon2";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import jwt, { JwtPayload, SignOptions } from "jsonwebtoken";
 import { getSuperAdminEnv } from "./config";
 
 export type SuperAdminTokenPayload = JwtPayload & {
@@ -52,7 +52,11 @@ export function issueSuperAdminToken() {
     email: env.email,
   };
 
-  const token = jwt.sign(payload, env.tokenSecret, { expiresIn: env.tokenTtl });
+  const options: SignOptions = {
+    expiresIn:
+      typeof env.tokenTtl === "number" ? env.tokenTtl : env.tokenTtl.toString(),
+  } as SignOptions;
+  const token = jwt.sign(payload, env.tokenSecret, options);
   return { token, expiresIn: env.tokenTtl };
 }
 
