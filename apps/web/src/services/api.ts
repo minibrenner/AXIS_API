@@ -7,6 +7,8 @@ export const API_URL = apiBase.replace(/\/$/, "");
 
 const defaultHeaders = { "Content-Type": "application/json" } as const;
 
+export type SuperAdminTokens = { token: string; tokenType: string; expiresIn: string };
+
 const readPayload = async <T>(res: Response): Promise<T> => {
   const raw = await res.text();
   if (!raw) {
@@ -20,6 +22,7 @@ const readPayload = async <T>(res: Response): Promise<T> => {
 };
 
 export type AuthTokens = { access: string; refresh: string };
+export type SuperAdminTokens = { token: string; tokenType: string; expiresIn: string };
 
 export async function login(email: string, password: string): Promise<AuthTokens> {
   const res = await fetch(`${API_URL}/auth/login`, {
@@ -40,6 +43,27 @@ export async function login(email: string, password: string): Promise<AuthTokens
     throw new Error("Resposta inesperada da API de login.");
   }
   return { access: payload.access, refresh: payload.refresh };
+}
+
+export async function loginSuperAdmin(email: string, password: string): Promise<SuperAdminTokens> {
+  const res = await fetch(`${API_URL}/super-admin/login`, {
+    method: "POST",
+    headers: defaultHeaders,
+    body: JSON.stringify({ email, password }),
+  });
+  const payload = await readPayload<SuperAdminTokens & { message?: string }>(res);
+
+  if (!res.ok) {
+    const details =
+      typeof payload?.message === "string"
+        ? payload.message
+        : "Falha ao autenticar o super admin.";
+    throw new Error(details);
+  }
+  if (!payload) {
+    throw new Error("Resposta inesperada da API de super admin.");
+  }
+  return payload;
 }
 
 export async function fetchCurrentUser(access: string) {
@@ -148,20 +172,3 @@ export type CashClosingReport = {
 
 export async function fetchCashClosingReport(access: string, cashSessionId: string): Promise<CashClosingReport> {
   const res = await fetch(`${API_URL}/cash/${cashSessionId}/report`, {
-    headers: { Authorization: `Bearer ${access}` },
-  });
-
-  const payload = await parseJson(res);
-
-  if (!res.ok) {
-    const message =
-      typeof payload?.error?.message === "string" ? payload.error.message : "Não foi possível carregar o relatório.";
-    throw new Error(message);
-  }
-
-  if (!payload) {
-    throw new Error("Resposta vazia ao tentar carregar o relatório.");
-  }
-
-  return payload as CashClosingReport;
-}
