@@ -1,0 +1,151 @@
+No projects matched the filters "c:\AXIS" in "C:\AXIS"
+
+> api@ dev C:\AXIS\apps\api
+> ts-node-dev --respawn --transpile-only src/server.ts
+
+[INFO] 12:04:39 ts-node-dev ver. 2.0.0 (using ts-node ver. 10.9.2, typescript ver. 5.9.3)
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+API ativa na porta 3000
+[INFO] 13:03:37 Restarting: C:\AXIS\apps\api\src\super-admin\controllers\users.controller.ts has been modified
+Compilation error in C:\AXIS\apps\api\src\super-admin\controllers\users.controller.ts
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+[ERROR] 13:03:39 ⨯ Unable to compile TypeScript:
+src/super-admin/controllers/users.controller.ts(95,7): error TS1005: ')' expected.
+
+[INFO] 13:03:56 Restarting: C:\AXIS\apps\api\src\super-admin\controllers\users.controller.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: ⚙️  override existing env vars with { override: true }
+API ativa na porta 3000
+[INFO] 14:37:40 Restarting: C:\AXIS\apps\api\src\super-admin\routes.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: ⚙️  enable debug logging with { debug: true }
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+Error: Cannot find module './controllers/overview.controller'
+Require stack:
+- C:\AXIS\apps\api\src\super-admin\routes.ts
+- C:\AXIS\apps\api\src\app.ts
+- C:\AXIS\apps\api\src\server.ts
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (C:\AXIS\apps\api\src\super-admin\routes.ts:10:1)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1706:14)
+[ERROR] 14:37:42 Error: Cannot find module './controllers/overview.controller'
+Require stack:
+- C:\AXIS\apps\api\src\super-admin\routes.ts
+- C:\AXIS\apps\api\src\app.ts
+- C:\AXIS\apps\api\src\server.ts
+[INFO] 15:19:46 Restarting: C:\AXIS\apps\api\src\super-admin\routes.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: ⚙️  suppress all logs with { quiet: true }
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+API ativa na porta 3000
+[INFO] 15:21:19 Reinitializing TS compilation
+[INFO] 15:21:20 Restarting: C:\AXIS\apps\api\tsconfig.json has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+API ativa na porta 3000
+[INFO] 15:23:18 Restarting: C:\AXIS\apps\api\src\super-admin\routes.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+ReferenceError: getOverview is not defined
+    at Object.<anonymous> (C:\AXIS\apps\api\src\super-admin\routes.ts:26:35)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1706:14)
+    at Module._compile (C:\AXIS\node_modules\.pnpm\source-map-support@0.5.21\node_modules\source-map-support\source-map-support.js:568:25)
+    at Module.m._compile (C:\Users\lucas\AppData\Local\Temp\ts-node-dev-hook-33637217587705237.js:69:33)
+    at node:internal/modules/cjs/loader:1839:10
+    at require.extensions..jsx.require.extensions..js (C:\Users\lucas\AppData\Local\Temp\ts-node-dev-hook-33637217587705237.js:114:20)
+    at require.extensions.<computed> (C:\Users\lucas\AppData\Local\Temp\ts-node-dev-hook-33637217587705237.js:71:20)
+    at Object.nodeDevHook [as .ts] (C:\AXIS\node_modules\.pnpm\ts-node-dev@2.0.0_@types+node@24.10.0_typescript@5.9.3\node_modules\ts-node-dev\lib\hook.js:63:13)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+[ERROR] 15:23:20 ReferenceError: getOverview is not defined
+[INFO] 15:23:38 Restarting: C:\AXIS\apps\api\src\super-admin\routes.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+API ativa na porta 3000
+[INFO] 15:24:18 Reinitializing TS compilation
+[INFO] 15:24:18 Restarting: C:\AXIS\apps\api\tsconfig.json has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+API ativa na porta 3000
+[INFO] 15:26:28 Restarting: C:\AXIS\apps\api\src\super-admin\routes.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: ⚙️  override existing env vars with { override: true }
+API ativa na porta 3000
+C:\AXIS\apps\api:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  api@ dev: `ts-node-dev --respawn --transpile-only src/server.ts`
+Exit status 1
+[INFO] 15:32:06 Restarting: C:\AXIS\apps\api\src\super-admin\routes.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: ⚙️  enable debug logging with { debug: true }
+API ativa na porta 3000
+[INFO] 19:25:38 Restarting: C:\AXIS\apps\api\src\app.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: ⚙️  enable debug logging with { debug: true }
+API ativa na porta 3000
+[INFO] 19:45:41 Restarting: C:\AXIS\apps\api\src\app.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: ⚙️  suppress all logs with { quiet: true }
+TypeError: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+    at name (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:225:13)
+    at parse (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:242:62)
+    at pathToRegexp (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:480:54)
+    at Object.match (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:438:28)
+    at matcher (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:86:23)
+    at new Layer (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:93:62)
+    at Function.route (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:428:17)
+    at Function.route (C:\AXIS\node_modules\.pnpm\express@5.1.0\node_modules\express\lib\application.js:257:22)
+    at Function.app.<computed> [as options] (C:\AXIS\node_modules\.pnpm\express@5.1.0\node_modules\express\lib\application.js:478:22)
+    at buildApp (C:\AXIS\apps\api\src\app.ts:44:7)
+[ERROR] 19:45:43 TypeError: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+[INFO] 19:45:54 Restarting: C:\AXIS\apps\api\src\super-admin\routes.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+TypeError: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+    at name (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:225:13)
+    at parse (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:242:62)
+    at pathToRegexp (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:480:54)
+    at Object.match (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:438:28)
+    at matcher (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:86:23)
+    at new Layer (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:93:62)
+    at Function.route (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:428:17)
+    at Function.Router.<computed> [as options] (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:447:24)
+    at Object.<anonymous> (C:\AXIS\apps\api\src\super-admin\routes.ts:32:18)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1706:14)
+[ERROR] 19:45:56 TypeError: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+[INFO] 19:56:12 Restarting: C:\AXIS\apps\api\src\app.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+TypeError: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+    at name (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:225:13)
+    at parse (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:242:62)
+    at pathToRegexp (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:480:54)
+    at Object.match (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:438:28)
+    at matcher (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:86:23)
+    at new Layer (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:93:62)
+    at Function.route (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:428:17)
+    at Function.Router.<computed> [as options] (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:447:24)
+    at Object.<anonymous> (C:\AXIS\apps\api\src\super-admin\routes.ts:32:18)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1706:14)
+[ERROR] 19:56:15 TypeError: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+[INFO] 20:01:51 Restarting: C:\AXIS\apps\api\src\super-admin\routes.ts has been modified
+[dotenv@17.2.3] injecting env (11) from ..\.env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.2.3] injecting env (0) from ..\.env -- tip: ⚙️  override existing env vars with { override: true }
+TypeError: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info
+    at name (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:225:13)
+    at parse (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:242:62)
+    at pathToRegexp (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:480:54)
+    at Object.match (C:\AXIS\node_modules\.pnpm\path-to-regexp@8.3.0\node_modules\path-to-regexp\src\index.ts:438:28)
+    at matcher (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:86:23)
+    at new Layer (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\lib\layer.js:93:62)
+    at Function.route (C:\AXIS\node_modules\.pnpm\router@2.2.0\node_modules\router\index.js:428:17)
+    at Function.route (C:\AXIS\node_modules\.pnpm\express@5.1.0\node_modules\express\lib\application.js:257:22)
+    at Function.app.<computed> [as options] (C:\AXIS\node_modules\.pnpm\express@5.1.0\node_modules\express\lib\application.js:478:22)
+    at buildApp (C:\AXIS\apps\api\src\app.ts:48:7)
+[ERROR] 20:01:53 TypeError: Missing parameter name at index 1: *; visit https://git.new/pathToRegexpError for info

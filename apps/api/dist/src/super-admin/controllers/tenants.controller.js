@@ -41,6 +41,17 @@ function formatUniqueTarget(target) {
     }
     return "dados";
 }
+function clampMaxOpenCashSessions(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        const normalized = Math.trunc(value);
+        if (normalized <= 0)
+            return 1;
+        if (normalized > 50)
+            return 50;
+        return normalized;
+    }
+    return undefined;
+}
 const buildTenantWhereCandidates = (identifier) => {
     const trimmed = identifier.trim();
     const digitsOnly = trimmed.replace(/\D/g, "");
@@ -135,8 +146,15 @@ const createTenant = async (req, res) => {
                 details: { field: "cpfResLoja" },
             });
         }
+        const safeMaxOpenCashSessions = clampMaxOpenCashSessions(payload.maxOpenCashSessions);
         const tenant = await client_2.prisma.tenant.create({
-            data: { name: ensuredName, email: ensuredEmail, cnpj, cpfResLoja },
+            data: {
+                name: ensuredName,
+                email: ensuredEmail,
+                cnpj,
+                cpfResLoja,
+                maxOpenCashSessions: safeMaxOpenCashSessions ?? 1,
+            },
         });
         return res.status(201).json(tenant);
     }
@@ -218,7 +236,7 @@ const getTenant = async (req, res) => {
 exports.getTenant = getTenant;
 const updateTenant = async (req, res) => {
     const { identifier } = req.params;
-    const { name, email, cnpj, cpfResLoja, isActive, password } = req.body ?? {};
+    const { name, email, cnpj, cpfResLoja, isActive, maxOpenCashSessions, password } = req.body ?? {};
     const data = {};
     if (name !== undefined)
         data.name = name;
@@ -230,6 +248,9 @@ const updateTenant = async (req, res) => {
         data.cpfResLoja = cpfResLoja;
     if (isActive !== undefined)
         data.isActive = isActive;
+    if (maxOpenCashSessions !== undefined) {
+        data.maxOpenCashSessions = clampMaxOpenCashSessions(maxOpenCashSessions) ?? 1;
+    }
     if (password) {
         data.passwordHash = await bcryptjs_1.default.hash(password, 10);
         data.mustChangePassword = true;

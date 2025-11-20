@@ -21,7 +21,7 @@ import {
 } from "../../storage/tokenStorage";
 import { AxisResetPasswordModal } from "./AxisResetPasswordModal";
 
-const axisLogo = require("../../../assets/axis-logo.png");
+import axisLogo from "../../../assets/axis-logo.png";
 
 type Theme = "light" | "dark";
 

@@ -35,6 +35,16 @@ function formatUniqueTarget(target: unknown): string {
   return "dados";
 }
 
+function clampMaxOpenCashSessions(value?: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const normalized = Math.trunc(value);
+    if (normalized <= 0) return 1;
+    if (normalized > 50) return 50;
+    return normalized;
+  }
+  return undefined;
+}
+
 export const buildTenantWhereCandidates = (identifier: string): Prisma.TenantWhereUniqueInput[] => {
   const trimmed = identifier.trim();
   const digitsOnly = trimmed.replace(/\D/g, "");
@@ -85,6 +95,7 @@ export const createTenant = async (req: Request, res: Response) => {
     email?: string;
     cnpj?: string;
     cpfResLoja?: string;
+    maxOpenCashSessions?: number;
   };
   const { name, email, cnpj, cpfResLoja } = payload;
 
@@ -145,8 +156,15 @@ export const createTenant = async (req: Request, res: Response) => {
       });
     }
 
+    const safeMaxOpenCashSessions = clampMaxOpenCashSessions(payload.maxOpenCashSessions);
     const tenant = await prisma.tenant.create({
-      data: { name: ensuredName, email: ensuredEmail, cnpj, cpfResLoja },
+      data: {
+        name: ensuredName,
+        email: ensuredEmail,
+        cnpj,
+        cpfResLoja,
+        maxOpenCashSessions: safeMaxOpenCashSessions ?? 1,
+      },
     });
 
     return res.status(201).json(tenant);
@@ -234,7 +252,7 @@ export const getTenant = async (req: Request, res: Response) => {
 
 export const updateTenant = async (req: Request, res: Response) => {
   const { identifier } = req.params;
-  const { name, email, cnpj, cpfResLoja, isActive, password } = req.body ?? {};
+  const { name, email, cnpj, cpfResLoja, isActive, maxOpenCashSessions, password } = req.body ?? {};
 
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
@@ -242,6 +260,9 @@ export const updateTenant = async (req: Request, res: Response) => {
   if (cnpj !== undefined) data.cnpj = cnpj;
   if (cpfResLoja !== undefined) data.cpfResLoja = cpfResLoja;
   if (isActive !== undefined) data.isActive = isActive;
+  if (maxOpenCashSessions !== undefined) {
+    data.maxOpenCashSessions = clampMaxOpenCashSessions(maxOpenCashSessions) ?? 1;
+  }
 
   if (password) {
     data.passwordHash = await bcrypt.hash(password, 10);

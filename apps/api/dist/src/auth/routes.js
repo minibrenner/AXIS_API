@@ -156,7 +156,8 @@ exports.authRouter.post("/reset-password", (0, validateBody_1.validateBody)(auth
         });
     }
     catch (err) {
-        if (err?.message === "TOKEN_INVALID") {
+        const message = err instanceof Error ? err.message : undefined;
+        if (message === "TOKEN_INVALID") {
             return (0, httpErrors_1.respondWithError)(res, {
                 status: 400,
                 code: httpErrors_1.ErrorCodes.TOKEN_INVALID,

@@ -2,6 +2,7 @@ import { Prisma, Role } from "@prisma/client";
 import argon2 from "argon2";
 import { type Request, type Response } from "express";
 import { prisma } from "../../prisma/client";
+import { TenantContext } from "../../tenancy/tenant.context";
 import { ErrorCodes, respondWithError } from "../../utils/httpErrors";
 import { buildTenantWhereCandidates } from "./tenants.controller";
 
@@ -70,27 +71,29 @@ export async function createTenantUser(req: Request, res: Response) {
     const supervisorPin =
       pinSupervisor && pinSupervisor.trim().length > 0 ? await argon2.hash(pinSupervisor.trim()) : undefined;
 
-    const user = await prisma.user.create({
-      data: {
-        tenantId,
-        email,
-        passwordHash,
-        name,
-        role: sanitizeRole(role),
-        isActive: true,
-        mustChangePassword: false,
-        ...(supervisorPin ? { pinSupervisor: supervisorPin } : {}),
-      },
-      select: {
-        id: true,
-        tenantId: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-      },
-    });
+    const user = await TenantContext.run(tenantId, async () =>
+      prisma.user.create({
+        data: {
+          tenantId,
+          email,
+          passwordHash,
+          name,
+          role: sanitizeRole(role),
+          isActive: true,
+          mustChangePassword: false,
+          ...(supervisorPin ? { pinSupervisor: supervisorPin } : {}),
+        },
+        select: {
+          id: true,
+          tenantId: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      })
+    );
 
     return res.status(201).json(user);
   } catch (error: unknown) {

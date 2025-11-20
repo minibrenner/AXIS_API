@@ -1,40 +1,24 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./axis-login.css";
 import {
-  AuthTokens,
+  fetchCurrentUser,
   login,
   requestPasswordReset,
 } from "../services/api";
+import {
+  storeTokens,
+  storeCurrentUser,
+  clearSession,
+  hasAdminAccess,
+} from "../auth/session";
+import type { AxisCurrentUser } from "../auth/session";
 
 type Theme = "light" | "dark";
 
-const TOKEN_KEY = "axis.auth.tokens";
-const TENANT_KEY = "axis.auth.tenantId";
 const EMAIL_KEY = "axis.auth.lastEmail";
 
 type Feedback = { kind: "error" | "success"; message: string } | null;
-
-const decodeJwt = (token: string) => {
-  try {
-    const [, payload] = token.split(".");
-    if (!payload) return null;
-    const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(decoded) as { tid?: string };
-  } catch {
-    return null;
-  }
-};
-
-const persistTokens = (tokens: AuthTokens) => {
-  localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
-  localStorage.setItem("axis.auth.timestamp", new Date().toISOString());
-
-  const decoded = decodeJwt(tokens.access);
-  if (decoded?.tid) {
-    localStorage.setItem(TENANT_KEY, decoded.tid);
-  }
-};
 
 export function AxisLoginPage() {
   const [theme, setTheme] = useState<Theme>("dark");
@@ -74,11 +58,17 @@ export function AxisLoginPage() {
     setIsSubmitting(true);
     try {
       const tokens = await login(email, password);
-      persistTokens(tokens);
+      storeTokens(tokens);
+      const user = (await fetchCurrentUser(tokens.access)) as AxisCurrentUser;
+      storeCurrentUser(user);
       localStorage.setItem(EMAIL_KEY, email);
       setFeedback({ kind: "success", message: "Login efetuado com sucesso." });
-      setTimeout(() => navigate(redirectTo, { replace: true }), 600);
+      const fallbackRoute = hasAdminAccess(user) ? "/admin/dashboard" : "/";
+      const destination =
+        redirectTo && redirectTo !== "/" ? redirectTo : fallbackRoute;
+      setTimeout(() => navigate(destination, { replace: true }), 600);
     } catch (err) {
+      clearSession();
       setFeedback({
         kind: "error",
         message:
@@ -217,15 +207,10 @@ export function AxisLoginPage() {
               </p>
             )}
 
-            <p className="axis-reset-hint">
-              Recebeu um token?{" "}
-              <Link className="axis-link" to={`/reset-password?email=${email}`}>
-                Redefina sua senha
-              </Link>
-            </p>
+          
 
             <p className="axis-footer">
-              AXIS Softwares • interface com efeito de vidro
+              AXIS Softwares • Since 2024 • Todos os direitos reservados
             </p>
           </form>
         </div>

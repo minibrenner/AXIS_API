@@ -65,11 +65,50 @@ authRouter.post("/login", async (req, res) => {
 /**
  * GET /auth/me
  * Header: Authorization: Bearer <access>
- * Retorna dados basicos do portador do token.
+ * Retorna dados basicos do portador do token,
+ * enriquecidos com nome/email do usuario.
  */
-authRouter.get("/me", jwtAuth(false), (req, res) => {
-  // aqui nao exigimos tenant match porque e apenas introspeccao
-  return res.json(req.user);
+authRouter.get("/me", jwtAuth(false), async (req, res) => {
+  if (!req.user) {
+    return respondWithError(res, {
+      status: 401,
+      code: ErrorCodes.UNAUTHENTICATED,
+      message: "Nao autenticado.",
+    });
+  }
+
+  const { userId } = req.user;
+
+  try {
+    const user = await basePrisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, tenantId: true, role: true, name: true, email: true },
+    });
+
+    if (!user) {
+      return respondWithError(res, {
+        status: 404,
+        code: ErrorCodes.USER_NOT_FOUND,
+        message: "Usuario nao encontrado.",
+        details: { userId },
+      });
+    }
+
+    return res.json({
+      userId: user.id,
+      tenantId: user.tenantId,
+      role: user.role,
+      type: "access" as const,
+      name: user.name ?? user.email,
+    });
+  } catch (err) {
+    return respondWithError(res, {
+      status: 500,
+      code: ErrorCodes.INTERNAL,
+      message: "Falha ao obter dados do usuario.",
+      details: { reason: err instanceof Error ? err.message : "unknown" },
+    });
+  }
 });
 
 /**

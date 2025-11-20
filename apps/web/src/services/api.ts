@@ -1,13 +1,30 @@
-const apiBase =
+const configuredApiUrl =
   typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
     ? String(import.meta.env.VITE_API_URL)
-    : "http://localhost:3000/api";
+    : "";
+
+const apiBase = configuredApiUrl || "http://localhost:3000/api";
 
 export const API_URL = apiBase.replace(/\/$/, "");
 
 const defaultHeaders = { "Content-Type": "application/json" } as const;
 
-export type SuperAdminTokens = { token: string; tokenType: string; expiresIn: string };
+const defaultNetworkErrorMessage =
+  "Não foi possível conectar com a API. Verifique se o backend está ativo e se o domínio deste front-end foi liberado no CORS.";
+
+async function safeFetch(
+  input: RequestInfo,
+  init?: RequestInit,
+  networkErrorMessage?: string,
+): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    const err = new Error(networkErrorMessage ?? defaultNetworkErrorMessage);
+    (err as { cause?: unknown }).cause = error;
+    throw err;
+  }
+}
 
 const readPayload = async <T>(res: Response): Promise<T> => {
   const raw = await res.text();
@@ -25,11 +42,15 @@ export type AuthTokens = { access: string; refresh: string };
 export type SuperAdminTokens = { token: string; tokenType: string; expiresIn: string };
 
 export async function login(email: string, password: string): Promise<AuthTokens> {
-  const res = await fetch(`${API_URL}/auth/login`, {
-    method: "POST",
-    headers: defaultHeaders,
-    body: JSON.stringify({ email, password }),
-  });
+  const res = await safeFetch(
+    `${API_URL}/auth/login`,
+    {
+      method: "POST",
+      headers: defaultHeaders,
+      body: JSON.stringify({ email, password }),
+    },
+    "Não foi possível alcançar a API de autenticação. Verifique se o backend e o CORS estão configurados.",
+  );
   const payload = await readPayload<AuthTokens & { message?: string }>(res);
 
   if (!res.ok) {
@@ -46,11 +67,15 @@ export async function login(email: string, password: string): Promise<AuthTokens
 }
 
 export async function loginSuperAdmin(email: string, password: string): Promise<SuperAdminTokens> {
-  const res = await fetch(`${API_URL}/super-admin/login`, {
-    method: "POST",
-    headers: defaultHeaders,
-    body: JSON.stringify({ email, password }),
-  });
+  const res = await safeFetch(
+    `${API_URL}/super-admin/login`,
+    {
+      method: "POST",
+      headers: defaultHeaders,
+      body: JSON.stringify({ email, password }),
+    },
+    "Não foi possível conectar com a API de super admin. Verifique se o backend está ativo e se o CORS permite este domínio.",
+  );
   const payload = await readPayload<SuperAdminTokens & { message?: string }>(res);
 
   if (!res.ok) {
@@ -128,6 +153,139 @@ export async function fetchReceipt(access: string, saleId: string) {
   return res.json();
 }
 
+export type SuperAdminMetrics = {
+  totalLojasAtivas: number;
+  totalUsuariosAtivos: number;
+  totalLojasDesativadas: number;
+  totalUsuariosDesativados: number;
+};
+
+export type Tenant = {
+  id: string;
+  name: string;
+  email: string;
+  cnpj: string | null;
+  cpfResLoja: string | null;
+  isActive: boolean;
+  maxOpenCashSessions: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateTenantPayload = {
+  name: string;
+  email: string;
+  password?: string;
+  cnpj?: string;
+  cpfResLoja?: string;
+  maxOpenCashSessions?: number;
+};
+
+function getStoredSuperAdminToken(): string | null {
+  return localStorage.getItem("axis.superadmin.token");
+}
+
+async function saFetch(token: string | null, path: string, options: RequestInit = {}) {
+  const resolvedToken = token ?? getStoredSuperAdminToken();
+  if (!resolvedToken) {
+    throw new Error("Token de super admin ausente. Faça login novamente.");
+  }
+
+  const res = await fetch(`${API_URL}/super-admin${path}`, {
+    ...options,
+    headers: {
+      ...options.headers,
+      Authorization: `Bearer ${resolvedToken}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (res.status === 401) {
+    localStorage.removeItem("axis.superadmin.token");
+    throw new Error("Sessão de super admin expirou. Faça login novamente.");
+  }
+  return res;
+}
+
+export async function fetchSuperAdminOverview(token: string): Promise<SuperAdminMetrics> {
+  const res = await saFetch(token, "/overview");
+  if (!res.ok) {
+    throw new Error("Não foi possível obter os indicadores do super admin.");
+  }
+  return res.json();
+}
+
+export async function createTenantAsSuperAdmin(
+  token: string,
+  payload: CreateTenantPayload,
+): Promise<Tenant> {
+  const res = await saFetch(token, "/tenants", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJson(res);
+  if (!res.ok) {
+    const err = new Error(data?.message ?? "Falha ao criar tenant.");
+    if (data?.field) {
+      (err as Error & { field: string }).field = data.field;
+    }
+    throw err;
+  }
+  return data;
+}
+
+export async function fetchTenantsAsSuperAdmin(token: string): Promise<Tenant[]> {
+  const res = await saFetch(token, "/tenants");
+  if (!res.ok) {
+    throw new Error("Não foi possível obter a lista de tenants.");
+  }
+  return res.json();
+}
+
+export async function updateTenantAsSuperAdmin(
+  token: string,
+  tenantId: string,
+  payload: Partial<CreateTenantPayload> & { isActive?: boolean },
+): Promise<Tenant> {
+  const res = await saFetch(token, `/tenants/${tenantId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJson(res);
+  if (!res.ok) {
+    throw new Error(data?.message ?? "Falha ao atualizar tenant.");
+  }
+  return data;
+}
+
+export type CreateTenantUserBody = {
+  tenantIdentifier: string;
+  email: string;
+  password?: string;
+  name?: string;
+  role?: "OWNER" | "ADMIN" | "ATTENDANT";
+  pinSupervisor?: string;
+};
+
+export async function createTenantUserAsSuperAdmin(
+  token: string,
+  payload: CreateTenantUserBody,
+): Promise<void> {
+  const { tenantIdentifier, ...rest } = payload;
+  const identifier = tenantIdentifier?.trim();
+  if (!identifier) {
+    throw new Error("Tenant identifier obrigat��rio para criar usuǭrio.");
+  }
+
+  const res = await saFetch(token, `/tenants/${identifier}/users`, {
+    method: "POST",
+    body: JSON.stringify(rest),
+  });
+  if (!res.ok) {
+    const data = await parseJson(res);
+    throw new Error(data?.message ?? "Falha ao criar usuário para o tenant.");
+  }
+}
+
 const parseJson = async (res: Response) => {
   const raw = await res.text();
   if (!raw) return null;
@@ -172,3 +330,12 @@ export type CashClosingReport = {
 
 export async function fetchCashClosingReport(access: string, cashSessionId: string): Promise<CashClosingReport> {
   const res = await fetch(`${API_URL}/cash/${cashSessionId}/report`, {
+    headers: { Authorization: `Bearer ${access}` },
+  });
+
+  if (!res.ok) {
+    throw new Error("Falha ao buscar relatório de fechamento de caixa.");
+  }
+
+  return res.json();
+}

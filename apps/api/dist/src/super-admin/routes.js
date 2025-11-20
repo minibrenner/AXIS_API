@@ -9,6 +9,22 @@ const user_schemas_1 = require("./validators/user.schemas");
 const users_controller_1 = require("./controllers/users.controller");
 const auth_controller_1 = require("./controllers/auth.controller");
 const auth_schemas_1 = require("./validators/auth.schemas");
+const client_1 = require("../prisma/client");
+async function getOverview(_req, res) {
+    console.log("super-admin overview requested");
+    const [totalLojasAtivas, totalLojasDesativadas, totalUsuariosAtivos, totalUsuariosDesativados] = await Promise.all([
+        client_1.basePrisma.tenant.count({ where: { isActive: true } }),
+        client_1.basePrisma.tenant.count({ where: { isActive: false } }),
+        client_1.basePrisma.user.count({ where: { isActive: true } }),
+        client_1.basePrisma.user.count({ where: { isActive: false } }),
+    ]);
+    return res.json({
+        totalLojasAtivas,
+        totalUsuariosAtivos,
+        totalLojasDesativadas,
+        totalUsuariosDesativados,
+    });
+}
 const superAdminRouter = (0, express_1.Router)();
 superAdminRouter.post("/login", (0, validateBody_1.validateBody)(auth_schemas_1.superAdminLoginSchema), auth_controller_1.loginSuperAdmin);
 superAdminRouter.use(superAdmin_guard_1.superAdminGuard);
@@ -21,5 +37,6 @@ superAdminRouter.post("/tenants/:identifier/users", (req, _res, next) => {
     req.body.tenantIdentifier = req.params.identifier;
     next();
 }, (0, validateBody_1.validateBody)(user_schemas_1.createTenantUserSchema), users_controller_1.createTenantUser);
+superAdminRouter.get("/overview", getOverview);
 exports.default = superAdminRouter;
 //# sourceMappingURL=routes.js.map

@@ -20,6 +20,7 @@ const PAYMENT_LABELS = {
 const PAYMENT_ORDER = ["debit", "credit", "vr", "va", "cash", "pix", "store_credit"];
 const ROLE_GUARD = (0, rbac_1.allowRoles)("ADMIN", "OWNER", "ATTENDANT");
 const openSchema = zod_1.z.object({
+    registerNumber: zod_1.z.string().trim().min(1).max(32).optional(),
     openingCents: zod_1.z.coerce.number().int().nonnegative(),
     notes: zod_1.z.string().trim().max(280).optional(),
 });
@@ -38,17 +39,40 @@ const closeSchema = zod_1.z.object({
 const sessionParamSchema = zod_1.z.object({ cashSessionId: zod_1.z.string().cuid() });
 exports.cashRouter = (0, express_1.Router)();
 exports.cashRouter.post("/open", ROLE_GUARD, async (req, res) => {
-    const { openingCents, notes } = openSchema.parse(req.body);
+    const { registerNumber, openingCents, notes } = openSchema.parse(req.body);
     const tenantId = req.tenantId;
-    const existing = await client_1.prisma.cashSession.findFirst({
+    const tenant = await client_1.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+        throw new httpErrors_1.HttpError({
+            status: 404,
+            code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
+            message: "Tenant não encontrado.",
+        });
+    }
+    const openCount = await client_1.prisma.cashSession.count({
         where: { tenantId, closedAt: null },
     });
-    if (existing) {
+    const maxOpen = tenant.maxOpenCashSessions ?? 1;
+    if (openCount >= maxOpen) {
         throw new httpErrors_1.HttpError({
             status: 409,
             code: httpErrors_1.ErrorCodes.CONFLICT,
-            message: "Já existe um caixa aberto para este tenant.",
+            message: "Caixas abertos excede o número permitido, por favor feche um ou mais caixas para continuar.",
+            details: { maxOpen },
         });
+    }
+    const normalizedRegister = registerNumber?.length ? registerNumber : null;
+    if (normalizedRegister) {
+        const registerInUse = await client_1.prisma.cashSession.findFirst({
+            where: { tenantId, registerNumber: normalizedRegister, closedAt: null },
+        });
+        if (registerInUse) {
+            throw new httpErrors_1.HttpError({
+                status: 409,
+                code: httpErrors_1.ErrorCodes.CONFLICT,
+                message: "Já existe um caixa aberto com essa numeração para este tenant.",
+            });
+        }
     }
     const session = await client_1.prisma.cashSession.create({
         data: {
@@ -56,6 +80,7 @@ exports.cashRouter.post("/open", ROLE_GUARD, async (req, res) => {
             userId: req.user.userId,
             openingCents,
             notes: notes?.length ? notes : null,
+            registerNumber: normalizedRegister,
         },
     });
     res.status(201).json({

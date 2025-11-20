@@ -74,6 +74,7 @@ const PAYMENT_ORDER: PayMethod[] = ["debit", "credit", "vr", "va", "cash", "pix"
 const ROLE_GUARD = allowRoles("ADMIN", "OWNER", "ATTENDANT");
 
 const openSchema = z.object({
+  registerNumber: z.string().trim().min(1).max(32).optional(),
   openingCents: z.coerce.number().int().nonnegative(),
   notes: z.string().trim().max(280).optional(),
 });
@@ -97,19 +98,45 @@ const sessionParamSchema = z.object({ cashSessionId: z.string().cuid() });
 export const cashRouter = Router();
 
 cashRouter.post("/open", ROLE_GUARD, async (req, res) => {
-  const { openingCents, notes } = openSchema.parse(req.body);
+  const { registerNumber, openingCents, notes } = openSchema.parse(req.body);
   const tenantId = req.tenantId!;
 
-  const existing = await prisma.cashSession.findFirst({
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  if (!tenant) {
+    throw new HttpError({
+      status: 404,
+      code: ErrorCodes.TENANT_NOT_FOUND,
+      message: "Tenant não encontrado.",
+    });
+  }
+
+  const openCount = await prisma.cashSession.count({
     where: { tenantId, closedAt: null },
   });
 
-  if (existing) {
+  const maxOpen = tenant.maxOpenCashSessions ?? 1;
+  if (openCount >= maxOpen) {
     throw new HttpError({
       status: 409,
       code: ErrorCodes.CONFLICT,
-      message: "Já existe um caixa aberto para este tenant.",
+      message:
+        "Caixas abertos excede o número permitido, por favor feche um ou mais caixas para continuar.",
+      details: { maxOpen },
     });
+  }
+
+  const normalizedRegister = registerNumber?.length ? registerNumber : null;
+  if (normalizedRegister) {
+    const registerInUse = await prisma.cashSession.findFirst({
+      where: { tenantId, registerNumber: normalizedRegister, closedAt: null },
+    });
+    if (registerInUse) {
+      throw new HttpError({
+        status: 409,
+        code: ErrorCodes.CONFLICT,
+        message: "Já existe um caixa aberto com essa numeração para este tenant.",
+      });
+    }
   }
 
   const session = await prisma.cashSession.create({
@@ -118,6 +145,7 @@ cashRouter.post("/open", ROLE_GUARD, async (req, res) => {
       userId: req.user!.userId,
       openingCents,
       notes: notes?.length ? notes : null,
+      registerNumber: normalizedRegister,
     },
   });
 

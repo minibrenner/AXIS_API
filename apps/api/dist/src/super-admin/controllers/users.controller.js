@@ -7,6 +7,7 @@ exports.createTenantUser = createTenantUser;
 const client_1 = require("@prisma/client");
 const argon2_1 = __importDefault(require("argon2"));
 const client_2 = require("../../prisma/client");
+const tenant_context_1 = require("../../tenancy/tenant.context");
 const httpErrors_1 = require("../../utils/httpErrors");
 const tenants_controller_1 = require("./tenants.controller");
 const sanitizeRole = (role) => {
@@ -56,7 +57,7 @@ async function createTenantUser(req, res) {
     try {
         const passwordHash = await argon2_1.default.hash(password);
         const supervisorPin = pinSupervisor && pinSupervisor.trim().length > 0 ? await argon2_1.default.hash(pinSupervisor.trim()) : undefined;
-        const user = await client_2.prisma.user.create({
+        const user = await tenant_context_1.TenantContext.run(tenantId, async () => client_2.prisma.user.create({
             data: {
                 tenantId,
                 email,
@@ -76,7 +77,7 @@ async function createTenantUser(req, res) {
                 isActive: true,
                 createdAt: true,
             },
-        });
+        }));
         return res.status(201).json(user);
     }
     catch (error) {

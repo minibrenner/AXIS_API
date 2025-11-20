@@ -19,6 +19,7 @@ model Tenant {
   name        String     @unique
   cnpj        String?    @unique
   isActive    Boolean    @default(true)
+  maxOpenCashSessions Int @default(1)
   users       User[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -450,6 +451,7 @@ model CashSession {
   openingCents          Int
   closingCents          Int?
   notes                 String?
+  registerNumber        String?
   createdAt             DateTime            @default(now())
   closedByUserId        String?
   closingSupervisorId   String?
