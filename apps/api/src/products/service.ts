@@ -2,23 +2,28 @@
 import { prisma } from "../prisma/client";
 import type { CreateProductInput, UpdateProductInput } from "./dto";
 
+type UpdateProductWithImage = UpdateProductInput & { imagePath?: string };
+type CreateProductWithImage = CreateProductInput & { imagePath?: string };
+
 export async function listProducts(tenantId: string, q?: string) {
   return prisma.product.findMany({
     where: {
       tenantId,
       isActive: true,
-      OR: q ? [
-        { name: { contains: q, mode: "insensitive" } },
-        { barcode: { equals: q } },
-        { sku: { equals: q } }
-      ] : undefined
+      OR: q
+        ? [
+            { name: { contains: q, mode: "insensitive" } },
+            { barcode: { equals: q } },
+            { sku: { equals: q } },
+          ]
+        : undefined,
     },
     orderBy: { name: "asc" },
-    take: 100
+    take: 100,
   });
 }
 
-export async function createProduct(tenantId: string, data: CreateProductInput) {
+export async function createProduct(tenantId: string, data: CreateProductWithImage) {
   const price = String(data.price).replace(",", ".");
   const cost = data.cost ? String(data.cost).replace(",", ".") : undefined;
   const minStock = data.minStock ? String(data.minStock).replace(",", ".") : undefined;
@@ -38,23 +43,31 @@ export async function createProduct(tenantId: string, data: CreateProductInput) 
       cest: data.cest,
       csosn: data.csosn,
       cfop: data.cfop,
-    }
+      isActive: data.isActive ?? undefined,
+      imagePath: data.imagePath,
+    },
   });
 }
 
-export async function updateProduct(tenantId: string, id: string, data: UpdateProductInput) {
+export async function updateProduct(tenantId: string, id: string, data: UpdateProductWithImage) {
   const price = data.price ? String(data.price).replace(",", ".") : undefined;
   const cost = data.cost ? String(data.cost).replace(",", ".") : undefined;
   const minStock = data.minStock ? String(data.minStock).replace(",", ".") : undefined;
 
   return prisma.product.update({
-    where: { id },
-    data: { ...data, price, cost, minStock },
+    where: { id, tenantId },
+    data: {
+      ...data,
+      price,
+      cost,
+      minStock,
+      imagePath: data.imagePath,
+    },
   });
 }
 
 export async function softDeleteProduct(tenantId: string, id: string) {
-  return prisma.product.update({ where: { id }, data: { isActive: false } });
+  return prisma.product.update({ where: { id, tenantId }, data: { isActive: false } });
 }
 
 export async function getProduct(tenantId: string, id: string) {

@@ -21,7 +21,7 @@ function App() {
         />
         <Route path="/admin/dashboard" element={<AxisAdminDashboardPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/" element={<CashClosingReportPage />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

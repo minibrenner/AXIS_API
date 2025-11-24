@@ -31,7 +31,9 @@ superAdminRouter.use(superAdmin_guard_1.superAdminGuard);
 superAdminRouter.get("/tenants", tenants_controller_1.listTenants);
 superAdminRouter.get("/tenants/:identifier", tenants_controller_1.getTenant);
 superAdminRouter.post("/tenants", (0, validateBody_1.validateBody)(tenant_schemas_1.createTenantSchema), tenants_controller_1.createTenant);
+// Aceita tanto PUT quanto PATCH para atualiza��o parcial de tenants
 superAdminRouter.put("/tenants/:identifier", (0, validateBody_1.validateBody)(tenant_schemas_1.updateTenantSchema), tenants_controller_1.updateTenant);
+superAdminRouter.patch("/tenants/:identifier", (0, validateBody_1.validateBody)(tenant_schemas_1.updateTenantSchema), tenants_controller_1.updateTenant);
 superAdminRouter.delete("/tenants/:identifier", tenants_controller_1.deleteTenant);
 superAdminRouter.post("/tenants/:identifier/users", (req, _res, next) => {
     req.body.tenantIdentifier = req.params.identifier;

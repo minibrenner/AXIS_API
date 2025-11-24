@@ -57,9 +57,9 @@ export function AxisLoginPage() {
     setFeedback(null);
     setIsSubmitting(true);
     try {
-      const tokens = await login(email, password);
-      storeTokens(tokens);
-      const user = (await fetchCurrentUser(tokens.access)) as AxisCurrentUser;
+      const { access } = await login(email, password);
+      storeTokens({ access });
+      const user = (await fetchCurrentUser()) as AxisCurrentUser;
       storeCurrentUser(user);
       localStorage.setItem(EMAIL_KEY, email);
       setFeedback({ kind: "success", message: "Login efetuado com sucesso." });
@@ -110,10 +110,12 @@ export function AxisLoginPage() {
   };
 
   return (
-    <div className={`axis-root axis-${theme}`}>
-      <header className="axis-topbar">
+    <div className={`axis-login-root axis-${theme}`}>
+      <header className="axis-login-topbar">
         <button
-          className="axis-toggle"
+          className={`axis-login-toggle ${
+            showForm ? "axis-login-toggle-visible" : ""
+          }`}
           type="button"
           onClick={() => setTheme(isDark ? "light" : "dark")}
         >

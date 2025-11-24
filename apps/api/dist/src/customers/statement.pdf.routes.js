@@ -4,13 +4,15 @@ exports.statementPdfRouter = void 0;
 const express_1 = require("express");
 const statement_pdf_service_1 = require("./statement.pdf.service");
 const ledger_service_1 = require("./ledger.service");
+const tenant_context_1 = require("../tenancy/tenant.context");
 exports.statementPdfRouter = (0, express_1.Router)();
 const pdf = new statement_pdf_service_1.StatementPdfService();
 const ledger = new ledger_service_1.LedgerService();
 exports.statementPdfRouter.get("/:id/ledger/statement.pdf", async (req, res) => {
     const from = req.query.from ? new Date(String(req.query.from)) : undefined;
     const to = req.query.to ? new Date(String(req.query.to)) : undefined;
-    const data = await ledger.statement(req.params.id, from, to);
+    const tenantId = req.user.tenantId;
+    const data = await tenant_context_1.TenantContext.run(tenantId, () => ledger.statement(req.params.id, from, to));
     const items = data.items.map((item) => ({
         createdAt: item.createdAt,
         type: item.type,

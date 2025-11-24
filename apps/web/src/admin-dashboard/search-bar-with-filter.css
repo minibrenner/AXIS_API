@@ -1,0 +1,155 @@
+.axis-search-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+}
+
+.axis-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9999px;
+  padding: 6px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  background: rgba(15, 23, 42, 0.9);
+  margin-top: 1vw;
+}
+
+.axis-root.axis-light .axis-search-bar {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(148, 163, 184, 0.9);
+}
+
+/* Animated core input (inspired no snippet) */
+.axis-search-core-input {
+  color: inherit;
+  font-size: 0.85rem;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 8px 4px;
+  width: 100%;
+}
+
+.axis-search-core-input::placeholder {
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.axis-search-filter-button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 6px;
+  
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+  align-items: center;
+}
+
+.axis-search-filter-button span {
+  width: 18px;
+  height: 2px;
+  background: rgba(148, 163, 184, 0.95);
+  border-radius: 999px;
+}
+
+.axis-root.axis-light .axis-search-filter-button span {
+  background: #111827;
+}
+
+.axis-search-filter-button:hover span {
+  transform: translateX(-1px);
+}
+
+.axis-filter-popover {
+  position: absolute;
+  right: 6px;
+  top: 100%;
+  margin-top: 6px;
+  min-width: 220px;
+  background: rgba(15, 23, 42, 0.98);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.9);
+  z-index: 20;
+  overflow: hidden;
+}
+
+.axis-root.axis-light .axis-filter-popover {
+  background: #ffffff;
+  border-color: rgba(148, 163, 184, 0.9);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.2);
+}
+
+.axis-filter-header {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e5e7eb;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(30, 64, 175, 0.7);
+}
+
+.axis-root.axis-light .axis-filter-header {
+  color: #111827;
+  background: #f3f4f6;
+  border-bottom-color: rgba(148, 163, 184, 0.7);
+}
+
+.axis-filter-options {
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.axis-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.axis-root.axis-light .axis-filter-option {
+  color: #111827;
+}
+
+.axis-filter-option input {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.axis-filter-option:hover {
+  background: rgba(30, 64, 175, 0.3);
+}
+
+.axis-root.axis-light .axis-filter-option:hover {
+  background: #f3f4f6;
+}
+
+.axis-filter-option--active {
+  background: rgba(59, 130, 246, 0.3);
+  color: #bfdbfe;
+}
+
+.axis-root.axis-light .axis-filter-option--active {
+  background: #eef2ff;
+  color: #1d4ed8;
+}
+
+.axis-filter-empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+@media (max-width: 768px) {
+  .axis-search-wrapper {
+    max-width: 100%;
+  }
+}

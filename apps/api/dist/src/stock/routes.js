@@ -8,6 +8,7 @@ const rbac_1 = require("../security/rbac");
 const service_1 = require("./service");
 const client_2 = require("../prisma/client");
 const httpErrors_1 = require("../utils/httpErrors");
+const tenant_context_1 = require("../tenancy/tenant.context");
 const inSchema = zod_1.z.object({
     productId: zod_1.z.string(),
     locationId: zod_1.z.string(),
@@ -44,23 +45,27 @@ const locationParamSchema = zod_1.z.object({
 });
 exports.stockRouter = (0, express_1.Router)();
 exports.stockRouter.post("/in", (0, rbac_1.allowRoles)("ADMIN"), async (req, res) => {
+    const tenantId = req.tenantId;
     const body = inSchema.parse(req.body);
-    const result = await (0, service_1.stockIn)({ tenantId: req.tenantId, userId: req.user.userId, ...body });
+    const result = await tenant_context_1.TenantContext.run(tenantId, async () => (0, service_1.stockIn)({ tenantId, userId: req.user.userId, ...body }));
     res.json({ ok: true, quantity: result.quantity.toString() });
 });
 exports.stockRouter.post("/out", (0, rbac_1.allowRoles)("ADMIN", "ATTENDANT"), async (req, res) => {
+    const tenantId = req.tenantId;
     const body = outSchema.parse(req.body);
-    const result = await (0, service_1.stockOut)({ tenantId: req.tenantId, userId: req.user.userId, ...body });
+    const result = await tenant_context_1.TenantContext.run(tenantId, async () => (0, service_1.stockOut)({ tenantId, userId: req.user.userId, ...body }));
     res.json({ ok: true, quantity: result.quantity.toString(), wentNegative: result.wentNegative });
 });
 exports.stockRouter.post("/adjust", (0, rbac_1.allowRoles)("ADMIN"), async (req, res) => {
+    const tenantId = req.tenantId;
     const body = adjSchema.parse(req.body);
-    const result = await (0, service_1.stockAdjust)({ tenantId: req.tenantId, userId: req.user.userId, ...body });
+    const result = await tenant_context_1.TenantContext.run(tenantId, async () => (0, service_1.stockAdjust)({ tenantId, userId: req.user.userId, ...body }));
     res.json({ ok: true, quantity: result.quantity.toString(), wentNegative: result.wentNegative });
 });
 exports.stockRouter.get("/", (0, rbac_1.allowRoles)("ADMIN", "ATTENDANT"), async (req, res) => {
+    const tenantId = req.tenantId;
     const query = listQuerySchema.parse(req.query);
-    const data = await (0, service_1.listStock)(req.tenantId, query.productId, query.locationId);
+    const data = await tenant_context_1.TenantContext.run(tenantId, async () => (0, service_1.listStock)(tenantId, query.productId, query.locationId));
     res.json({
         items: data.map((d) => ({
             ...d,
@@ -69,8 +74,9 @@ exports.stockRouter.get("/", (0, rbac_1.allowRoles)("ADMIN", "ATTENDANT"), async
     });
 });
 exports.stockRouter.get("/movements", (0, rbac_1.allowRoles)("ADMIN"), async (req, res) => {
+    const tenantId = req.tenantId;
     const query = listQuerySchema.parse(req.query);
-    const data = await (0, service_1.listStockMovements)(req.tenantId, query.productId, query.locationId);
+    const data = await tenant_context_1.TenantContext.run(tenantId, async () => (0, service_1.listStockMovements)(tenantId, query.productId, query.locationId));
     res.json({
         items: data.map((m) => ({
             ...m,
@@ -79,18 +85,21 @@ exports.stockRouter.get("/movements", (0, rbac_1.allowRoles)("ADMIN"), async (re
     });
 });
 exports.stockRouter.get("/level", (0, rbac_1.allowRoles)("ADMIN", "ATTENDANT"), async (req, res) => {
+    const tenantId = req.tenantId;
     const query = levelQuerySchema.parse(req.query);
-    const qty = await (0, service_1.getStockLevel)(req.tenantId, query.productId, query.locationId);
+    const qty = await tenant_context_1.TenantContext.run(tenantId, async () => (0, service_1.getStockLevel)(tenantId, query.productId, query.locationId));
     res.json({ quantity: qty.toString() });
 });
 exports.stockRouter.post("/init", (0, rbac_1.allowRoles)("ADMIN"), async (req, res) => {
+    const tenantId = req.tenantId;
     const body = initBodySchema.parse(req.body);
-    const row = await (0, service_1.initializeInventory)(req.tenantId, body.productId, body.locationId);
+    const row = await tenant_context_1.TenantContext.run(tenantId, async () => (0, service_1.initializeInventory)(tenantId, body.productId, body.locationId));
     res.status(201).json({ id: row.id, quantity: row.quantity.toString() });
 });
 exports.stockRouter.post("/init/bulk", (0, rbac_1.allowRoles)("ADMIN"), async (req, res) => {
+    const tenantId = req.tenantId;
     const body = initBulkBodySchema.parse(req.body);
-    const results = await Promise.all(body.items.map((it) => (0, service_1.initializeInventory)(req.tenantId, it.productId, it.locationId)));
+    const results = await tenant_context_1.TenantContext.run(tenantId, async () => Promise.all(body.items.map((it) => (0, service_1.initializeInventory)(tenantId, it.productId, it.locationId))));
     res.status(201).json({
         items: results.map((r) => ({
             id: r.id,
@@ -101,18 +110,20 @@ exports.stockRouter.post("/init/bulk", (0, rbac_1.allowRoles)("ADMIN"), async (r
     });
 });
 exports.stockRouter.get("/locations", (0, rbac_1.allowRoles)("ADMIN", "OWNER", "ATTENDANT"), async (req, res) => {
-    const items = await client_2.prisma.stockLocation.findMany({
-        where: { tenantId: req.tenantId },
+    const tenantId = req.tenantId;
+    const items = await tenant_context_1.TenantContext.run(tenantId, async () => client_2.prisma.stockLocation.findMany({
+        where: { tenantId },
         orderBy: { name: "asc" },
-    });
+    }));
     res.json({ items });
 });
 exports.stockRouter.post("/locations", (0, rbac_1.allowRoles)("ADMIN", "OWNER"), async (req, res) => {
+    const tenantId = req.tenantId;
     const { name } = locationBodySchema.parse(req.body);
     try {
-        const location = await client_2.prisma.stockLocation.create({
-            data: { tenantId: req.tenantId, name },
-        });
+        const location = await tenant_context_1.TenantContext.run(tenantId, async () => client_2.prisma.stockLocation.create({
+            data: { tenantId, name },
+        }));
         res.status(201).json(location);
     }
     catch (error) {
@@ -127,12 +138,13 @@ exports.stockRouter.post("/locations", (0, rbac_1.allowRoles)("ADMIN", "OWNER"),
     }
 });
 exports.stockRouter.put("/locations/:locationId", (0, rbac_1.allowRoles)("ADMIN", "OWNER"), async (req, res) => {
+    const tenantId = req.tenantId;
     const { locationId } = locationParamSchema.parse(req.params);
     const { name } = locationBodySchema.parse(req.body);
-    const updated = await client_2.prisma.stockLocation.updateMany({
-        where: { id: locationId, tenantId: req.tenantId },
+    const updated = await tenant_context_1.TenantContext.run(tenantId, async () => client_2.prisma.stockLocation.updateMany({
+        where: { id: locationId, tenantId },
         data: { name },
-    });
+    }));
     if (updated.count === 0) {
         throw new httpErrors_1.HttpError({
             status: 404,
@@ -140,17 +152,18 @@ exports.stockRouter.put("/locations/:locationId", (0, rbac_1.allowRoles)("ADMIN"
             message: "Deposito nao encontrado.",
         });
     }
-    const location = await client_2.prisma.stockLocation.findFirst({
-        where: { id: locationId, tenantId: req.tenantId },
-    });
+    const location = await tenant_context_1.TenantContext.run(tenantId, async () => client_2.prisma.stockLocation.findFirst({
+        where: { id: locationId, tenantId },
+    }));
     res.json(location);
 });
 exports.stockRouter.delete("/locations/:locationId", (0, rbac_1.allowRoles)("ADMIN", "OWNER"), async (req, res) => {
+    const tenantId = req.tenantId;
     const { locationId } = locationParamSchema.parse(req.params);
     try {
-        const removed = await client_2.prisma.stockLocation.deleteMany({
-            where: { id: locationId, tenantId: req.tenantId },
-        });
+        const removed = await tenant_context_1.TenantContext.run(tenantId, async () => client_2.prisma.stockLocation.deleteMany({
+            where: { id: locationId, tenantId },
+        }));
         if (removed.count === 0) {
             throw new httpErrors_1.HttpError({
                 status: 404,

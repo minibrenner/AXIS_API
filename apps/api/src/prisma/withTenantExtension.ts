@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { TenantContext } from "../tenancy/tenant.context";
+import { ErrorCodes, HttpError } from "../utils/httpErrors";
 
 /**
  * Lista dos modelos que precisam ser isolados por tenant.
@@ -113,7 +114,13 @@ export const withTenantExtension = () =>
           const tenantId = TenantContext.get();
 
           if (!tenantId) {
-            throw new Error("Tenant solicitado ainda nao existe");
+            throw new HttpError({
+              status: 500,
+              code: ErrorCodes.TENANT_NOT_RESOLVED,
+              message:
+                "Erro interno ao identificar a loja desta requisicao. Tente novamente ou faca login de novo.",
+              details: { reason: "TENANT_CONTEXT_MISSING", model, operation },
+            });
           }
 
           let nextArgs: unknown = args;

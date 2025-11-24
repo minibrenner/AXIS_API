@@ -15,6 +15,7 @@ exports.createProductSchema = zod_1.z.object({
     cest: zod_1.z.string().optional(),
     csosn: zod_1.z.string().optional(),
     cfop: zod_1.z.string().optional(),
+    isActive: zod_1.z.boolean().optional(),
 });
 exports.updateProductSchema = exports.createProductSchema.partial();
 //# sourceMappingURL=dto.js.map

@@ -18,6 +18,15 @@ const auth_schemas_1 = require("./validators/auth.schemas");
 const mailer_1 = require("../utils/mailer");
 const env_1 = require("../config/env");
 exports.authRouter = (0, express_1.Router)();
+const REFRESH_COOKIE_NAME = "axis_refresh";
+const REFRESH_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 dias (alinhado ao default de issueTokens)
+const refreshCookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: REFRESH_COOKIE_MAX_AGE_MS,
+    path: "/api/auth",
+};
 /**
  * POST /auth/login
  * Body: { email, password }
@@ -46,16 +55,53 @@ exports.authRouter.post("/login", async (req, res) => {
         });
     }
     const tokens = await tenant_context_1.TenantContext.run(user.tenantId, () => (0, auth_service_1.issueTokens)({ id: user.id, tenantId: user.tenantId, role: user.role }, req.get("user-agent") ?? "", req.ip));
-    return res.json(tokens);
+    res.cookie(REFRESH_COOKIE_NAME, tokens.refresh, refreshCookieOptions);
+    return res.json({ access: tokens.access, refresh: tokens.refresh });
 });
 /**
  * GET /auth/me
  * Header: Authorization: Bearer <access>
- * Retorna dados basicos do portador do token.
+ * Retorna dados basicos do portador do token,
+ * enriquecidos com nome/email do usuario.
  */
-exports.authRouter.get("/me", (0, middleware_1.jwtAuth)(false), (req, res) => {
-    // aqui nao exigimos tenant match porque e apenas introspeccao
-    return res.json(req.user);
+exports.authRouter.get("/me", (0, middleware_1.jwtAuth)(false), async (req, res) => {
+    if (!req.user) {
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 401,
+            code: httpErrors_1.ErrorCodes.UNAUTHENTICATED,
+            message: "Nao autenticado.",
+        });
+    }
+    const { userId } = req.user;
+    try {
+        const user = await client_1.basePrisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, tenantId: true, role: true, name: true, email: true },
+        });
+        if (!user) {
+            return (0, httpErrors_1.respondWithError)(res, {
+                status: 404,
+                code: httpErrors_1.ErrorCodes.USER_NOT_FOUND,
+                message: "Usuario nao encontrado.",
+                details: { userId },
+            });
+        }
+        return res.json({
+            userId: user.id,
+            tenantId: user.tenantId,
+            role: user.role,
+            type: "access",
+            name: user.name ?? user.email,
+        });
+    }
+    catch (err) {
+        return (0, httpErrors_1.respondWithError)(res, {
+            status: 500,
+            code: httpErrors_1.ErrorCodes.INTERNAL,
+            message: "Falha ao obter dados do usuario.",
+            details: { reason: err instanceof Error ? err.message : "unknown" },
+        });
+    }
 });
 /**
  * POST /auth/refresh
@@ -63,12 +109,15 @@ exports.authRouter.get("/me", (0, middleware_1.jwtAuth)(false), (req, res) => {
  * Valida o refresh (via hash em Session) e emite novo par de tokens.
  */
 exports.authRouter.post("/refresh", async (req, res) => {
-    const { refresh } = (req.body ?? {});
+    const body = (req.body ?? {});
+    const refreshFromBody = body.refresh;
+    const refreshFromCookie = req.cookies?.[REFRESH_COOKIE_NAME];
+    const refresh = refreshFromCookie ?? refreshFromBody;
     if (!refresh) {
         return (0, httpErrors_1.respondWithError)(res, {
             status: 400,
             code: httpErrors_1.ErrorCodes.BAD_REQUEST,
-            message: "Refresh token requerido.",
+            message: "Refresh token requerido (cookie ou corpo).",
         });
     }
     let payload;
@@ -102,7 +151,8 @@ exports.authRouter.post("/refresh", async (req, res) => {
     }
     // emite novos tokens com o mesmo tenant/role do payload
     const tokens = await tenant_context_1.TenantContext.run(payload.tid, () => (0, auth_service_1.issueTokens)({ id: payload.sub, tenantId: payload.tid, role: payload.role }));
-    return res.json(tokens);
+    res.cookie(REFRESH_COOKIE_NAME, tokens.refresh, refreshCookieOptions);
+    return res.json({ access: tokens.access, refresh: tokens.refresh });
 });
 /**
  * POST /auth/logout
@@ -118,6 +168,10 @@ exports.authRouter.post("/logout", (0, middleware_1.jwtAuth)(false), async (req,
         });
     }
     await tenant_context_1.TenantContext.run(req.user.tenantId, () => (0, auth_service_1.revokeAllUserSessions)(req.user.userId));
+    res.clearCookie(REFRESH_COOKIE_NAME, {
+        ...refreshCookieOptions,
+        maxAge: undefined,
+    });
     return res.json({ ok: true });
 });
 const genericResetResponse = {

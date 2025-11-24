@@ -1,5 +1,6 @@
 import express, { type ErrorRequestHandler } from "express";
 import cors, { type CorsOptions } from "cors";
+import cookieParser from "cookie-parser";
 import routes from "./routes";
 import superAdminRouter from "./super-admin/routes";
 import "./prisma/client";
@@ -44,13 +45,14 @@ export function buildApp() {
         },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-request-id", "x-correlation-id"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-request-id", "x-correlation-id", "x-tenant-id"],
     optionsSuccessStatus: 204,
   };
 
   const corsMiddleware = cors(corsOptions);
   app.use(corsMiddleware);
   app.options(/.*/, corsMiddleware);
+  app.use(cookieParser());
   app.use(express.json());
   app.use(requestContext);
   app.use("/api/super-admin", superAdminRouter);

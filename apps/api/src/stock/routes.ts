@@ -13,6 +13,7 @@ import {
 } from "./service";
 import { prisma } from "../prisma/client";
 import { ErrorCodes, HttpError } from "../utils/httpErrors";
+import { TenantContext } from "../tenancy/tenant.context";
 
 const inSchema = z.object({
   productId: z.string(),
@@ -59,26 +60,46 @@ const locationParamSchema = z.object({
 export const stockRouter = Router();
 
 stockRouter.post("/in", allowRoles("ADMIN"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const body = inSchema.parse(req.body);
-  const result = await stockIn({ tenantId: req.tenantId!, userId: req.user!.userId, ...body });
+
+  const result = await TenantContext.run(tenantId, async () =>
+    stockIn({ tenantId, userId: req.user!.userId, ...body }),
+  );
+
   res.json({ ok: true, quantity: result.quantity.toString() });
 });
 
 stockRouter.post("/out", allowRoles("ADMIN", "ATTENDANT"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const body = outSchema.parse(req.body);
-  const result = await stockOut({ tenantId: req.tenantId!, userId: req.user!.userId, ...body });
+
+  const result = await TenantContext.run(tenantId, async () =>
+    stockOut({ tenantId, userId: req.user!.userId, ...body }),
+  );
+
   res.json({ ok: true, quantity: result.quantity.toString(), wentNegative: result.wentNegative });
 });
 
 stockRouter.post("/adjust", allowRoles("ADMIN"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const body = adjSchema.parse(req.body);
-  const result = await stockAdjust({ tenantId: req.tenantId!, userId: req.user!.userId, ...body });
+
+  const result = await TenantContext.run(tenantId, async () =>
+    stockAdjust({ tenantId, userId: req.user!.userId, ...body }),
+  );
+
   res.json({ ok: true, quantity: result.quantity.toString(), wentNegative: result.wentNegative });
 });
 
 stockRouter.get("/", allowRoles("ADMIN", "ATTENDANT"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const query = listQuerySchema.parse(req.query);
-  const data = await listStock(req.tenantId!, query.productId, query.locationId);
+
+  const data = await TenantContext.run(tenantId, async () =>
+    listStock(tenantId, query.productId, query.locationId),
+  );
+
   res.json({
     items: data.map((d) => ({
       ...d,
@@ -88,8 +109,13 @@ stockRouter.get("/", allowRoles("ADMIN", "ATTENDANT"), async (req, res) => {
 });
 
 stockRouter.get("/movements", allowRoles("ADMIN"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const query = listQuerySchema.parse(req.query);
-  const data = await listStockMovements(req.tenantId!, query.productId, query.locationId);
+
+  const data = await TenantContext.run(tenantId, async () =>
+    listStockMovements(tenantId, query.productId, query.locationId),
+  );
+
   res.json({
     items: data.map((m) => ({
       ...m,
@@ -99,22 +125,37 @@ stockRouter.get("/movements", allowRoles("ADMIN"), async (req, res) => {
 });
 
 stockRouter.get("/level", allowRoles("ADMIN", "ATTENDANT"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const query = levelQuerySchema.parse(req.query);
-  const qty = await getStockLevel(req.tenantId!, query.productId, query.locationId);
+
+  const qty = await TenantContext.run(tenantId, async () =>
+    getStockLevel(tenantId, query.productId, query.locationId),
+  );
+
   res.json({ quantity: qty.toString() });
 });
 
 stockRouter.post("/init", allowRoles("ADMIN"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const body = initBodySchema.parse(req.body);
-  const row = await initializeInventory(req.tenantId!, body.productId, body.locationId);
+
+  const row = await TenantContext.run(tenantId, async () =>
+    initializeInventory(tenantId, body.productId, body.locationId),
+  );
+
   res.status(201).json({ id: row.id, quantity: row.quantity.toString() });
 });
 
 stockRouter.post("/init/bulk", allowRoles("ADMIN"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const body = initBulkBodySchema.parse(req.body);
-  const results = await Promise.all(
-    body.items.map((it) => initializeInventory(req.tenantId!, it.productId, it.locationId))
+
+  const results = await TenantContext.run(tenantId, async () =>
+    Promise.all(
+      body.items.map((it) => initializeInventory(tenantId, it.productId, it.locationId)),
+    ),
   );
+
   res.status(201).json({
     items: results.map((r) => ({
       id: r.id,
@@ -126,21 +167,28 @@ stockRouter.post("/init/bulk", allowRoles("ADMIN"), async (req, res) => {
 });
 
 stockRouter.get("/locations", allowRoles("ADMIN", "OWNER", "ATTENDANT"), async (req, res) => {
-  const items = await prisma.stockLocation.findMany({
-    where: { tenantId: req.tenantId! },
-    orderBy: { name: "asc" },
-  });
+  const tenantId = req.tenantId!;
+
+  const items = await TenantContext.run(tenantId, async () =>
+    prisma.stockLocation.findMany({
+      where: { tenantId },
+      orderBy: { name: "asc" },
+    }),
+  );
 
   res.json({ items });
 });
 
 stockRouter.post("/locations", allowRoles("ADMIN", "OWNER"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const { name } = locationBodySchema.parse(req.body);
 
   try {
-    const location = await prisma.stockLocation.create({
-      data: { tenantId: req.tenantId!, name },
-    });
+    const location = await TenantContext.run(tenantId, async () =>
+      prisma.stockLocation.create({
+        data: { tenantId, name },
+      }),
+    );
     res.status(201).json(location);
   } catch (error: unknown) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -155,13 +203,16 @@ stockRouter.post("/locations", allowRoles("ADMIN", "OWNER"), async (req, res) =>
 });
 
 stockRouter.put("/locations/:locationId", allowRoles("ADMIN", "OWNER"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const { locationId } = locationParamSchema.parse(req.params);
   const { name } = locationBodySchema.parse(req.body);
 
-  const updated = await prisma.stockLocation.updateMany({
-    where: { id: locationId, tenantId: req.tenantId! },
-    data: { name },
-  });
+  const updated = await TenantContext.run(tenantId, async () =>
+    prisma.stockLocation.updateMany({
+      where: { id: locationId, tenantId },
+      data: { name },
+    }),
+  );
 
   if (updated.count === 0) {
     throw new HttpError({
@@ -171,20 +222,25 @@ stockRouter.put("/locations/:locationId", allowRoles("ADMIN", "OWNER"), async (r
     });
   }
 
-  const location = await prisma.stockLocation.findFirst({
-    where: { id: locationId, tenantId: req.tenantId! },
-  });
+  const location = await TenantContext.run(tenantId, async () =>
+    prisma.stockLocation.findFirst({
+      where: { id: locationId, tenantId },
+    }),
+  );
 
   res.json(location);
 });
 
 stockRouter.delete("/locations/:locationId", allowRoles("ADMIN", "OWNER"), async (req, res) => {
+  const tenantId = req.tenantId!;
   const { locationId } = locationParamSchema.parse(req.params);
 
   try {
-    const removed = await prisma.stockLocation.deleteMany({
-      where: { id: locationId, tenantId: req.tenantId! },
-    });
+    const removed = await TenantContext.run(tenantId, async () =>
+      prisma.stockLocation.deleteMany({
+        where: { id: locationId, tenantId },
+      }),
+    );
 
     if (removed.count === 0) {
       throw new HttpError({

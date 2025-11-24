@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.withTenantExtension = void 0;
 const client_1 = require("@prisma/client");
 const tenant_context_1 = require("../tenancy/tenant.context");
+const httpErrors_1 = require("../utils/httpErrors");
 /**
  * Lista dos modelos que precisam ser isolados por tenant.
  * Caso um modelo nao esteja aqui, ele sera ignorado pelo middleware.
@@ -92,7 +93,12 @@ const withTenantExtension = () => client_1.Prisma.defineExtension({
                 }
                 const tenantId = tenant_context_1.TenantContext.get();
                 if (!tenantId) {
-                    throw new Error("Tenant solicitado ainda nao existe");
+                    throw new httpErrors_1.HttpError({
+                        status: 500,
+                        code: httpErrors_1.ErrorCodes.TENANT_NOT_RESOLVED,
+                        message: "Erro interno ao identificar a loja desta requisicao. Tente novamente ou faca login de novo.",
+                        details: { reason: "TENANT_CONTEXT_MISSING", model, operation },
+                    });
                 }
                 let nextArgs = args;
                 const ensureArgsRecord = () => {

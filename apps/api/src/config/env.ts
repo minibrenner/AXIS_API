@@ -46,4 +46,10 @@ export const env = {
   SMTP_USER: required("EMAIL_USER"),
   SMTP_PASS: required("EMAIL_PASS"),
   SMTP_FROM: optional("SMTP_FROM", required("EMAIL_USER")),
+
+  // Cloudflare R2 (S3 compatible) para imagens de categorias/produtos
+  R2_ENDPOINT: required("R2_ENDPOINT"),
+  R2_BUCKET: required("R2_BUCKET"),
+  R2_ACCESS_KEY_ID: required("R2_ACCESS_KEY_ID"),
+  R2_SECRET_ACCESS_KEY: required("R2_SECRET_ACCESS_KEY"),
 };

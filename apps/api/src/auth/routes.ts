@@ -1,5 +1,5 @@
 // apps/api/src/auth/routes.ts
-import { Router } from "express";
+import { Router, type CookieOptions } from "express";
 import argon2 from "argon2";
 import { basePrisma, prisma } from "../prisma/client";
 import {
@@ -22,6 +22,17 @@ import { sendPasswordResetEmail } from "../utils/mailer";
 import { env } from "../config/env";
 
 export const authRouter = Router();
+
+const REFRESH_COOKIE_NAME = "axis_refresh";
+const REFRESH_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7; // 7 dias (alinhado ao default de issueTokens)
+
+const refreshCookieOptions: CookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  maxAge: REFRESH_COOKIE_MAX_AGE_MS,
+  path: "/api/auth",
+};
 
 /**
  * POST /auth/login
@@ -59,7 +70,10 @@ authRouter.post("/login", async (req, res) => {
       req.ip
     )
   );
-  return res.json(tokens);
+
+  res.cookie(REFRESH_COOKIE_NAME, tokens.refresh, refreshCookieOptions);
+
+  return res.json({ access: tokens.access, refresh: tokens.refresh });
 });
 
 /**
@@ -117,12 +131,17 @@ authRouter.get("/me", jwtAuth(false), async (req, res) => {
  * Valida o refresh (via hash em Session) e emite novo par de tokens.
  */
 authRouter.post("/refresh", async (req, res) => {
-  const { refresh } = (req.body ?? {}) as { refresh?: string };
+  const body = (req.body ?? {}) as { refresh?: string };
+  const refreshFromBody = body.refresh;
+  const refreshFromCookie = req.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
+
+  const refresh = refreshFromCookie ?? refreshFromBody;
+
   if (!refresh) {
     return respondWithError(res, {
       status: 400,
       code: ErrorCodes.BAD_REQUEST,
-      message: "Refresh token requerido.",
+      message: "Refresh token requerido (cookie ou corpo).",
     });
   }
 
@@ -166,7 +185,10 @@ authRouter.post("/refresh", async (req, res) => {
   const tokens = await TenantContext.run(payload.tid, () =>
     issueTokens({ id: payload.sub, tenantId: payload.tid, role: payload.role })
   );
-  return res.json(tokens);
+
+  res.cookie(REFRESH_COOKIE_NAME, tokens.refresh, refreshCookieOptions);
+
+  return res.json({ access: tokens.access, refresh: tokens.refresh });
 });
 
 /**
@@ -185,6 +207,12 @@ authRouter.post("/logout", jwtAuth(false), async (req, res) => {
   await TenantContext.run(req.user.tenantId, () =>
     revokeAllUserSessions(req.user!.userId)
   );
+
+  res.clearCookie(REFRESH_COOKIE_NAME, {
+    ...refreshCookieOptions,
+    maxAge: undefined,
+  });
+
   return res.json({ ok: true });
 });
 

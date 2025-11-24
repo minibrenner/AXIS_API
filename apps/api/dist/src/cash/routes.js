@@ -8,6 +8,7 @@ const client_1 = require("../prisma/client");
 const supervisorAuth_1 = require("../security/supervisorAuth");
 const httpErrors_1 = require("../utils/httpErrors");
 const service_1 = require("../printing/service");
+const tenant_context_1 = require("../tenancy/tenant.context");
 const PAYMENT_LABELS = {
     debit: "Debito",
     credit: "Credito",
@@ -41,47 +42,49 @@ exports.cashRouter = (0, express_1.Router)();
 exports.cashRouter.post("/open", ROLE_GUARD, async (req, res) => {
     const { registerNumber, openingCents, notes } = openSchema.parse(req.body);
     const tenantId = req.tenantId;
-    const tenant = await client_1.prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) {
-        throw new httpErrors_1.HttpError({
-            status: 404,
-            code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
-            message: "Tenant não encontrado.",
+    const session = await tenant_context_1.TenantContext.run(tenantId, async () => {
+        const tenant = await client_1.prisma.tenant.findUnique({ where: { id: tenantId } });
+        if (!tenant) {
+            throw new httpErrors_1.HttpError({
+                status: 404,
+                code: httpErrors_1.ErrorCodes.TENANT_NOT_FOUND,
+                message: "Tenant nao encontrado.",
+            });
+        }
+        const openCount = await client_1.prisma.cashSession.count({
+            where: { tenantId, closedAt: null },
         });
-    }
-    const openCount = await client_1.prisma.cashSession.count({
-        where: { tenantId, closedAt: null },
-    });
-    const maxOpen = tenant.maxOpenCashSessions ?? 1;
-    if (openCount >= maxOpen) {
-        throw new httpErrors_1.HttpError({
-            status: 409,
-            code: httpErrors_1.ErrorCodes.CONFLICT,
-            message: "Caixas abertos excede o número permitido, por favor feche um ou mais caixas para continuar.",
-            details: { maxOpen },
-        });
-    }
-    const normalizedRegister = registerNumber?.length ? registerNumber : null;
-    if (normalizedRegister) {
-        const registerInUse = await client_1.prisma.cashSession.findFirst({
-            where: { tenantId, registerNumber: normalizedRegister, closedAt: null },
-        });
-        if (registerInUse) {
+        const maxOpen = tenant.maxOpenCashSessions ?? 1;
+        if (openCount >= maxOpen) {
             throw new httpErrors_1.HttpError({
                 status: 409,
                 code: httpErrors_1.ErrorCodes.CONFLICT,
-                message: "Já existe um caixa aberto com essa numeração para este tenant.",
+                message: "Caixas abertos excede o numero permitido, por favor feche um ou mais caixas para continuar.",
+                details: { maxOpen },
             });
         }
-    }
-    const session = await client_1.prisma.cashSession.create({
-        data: {
-            tenantId,
-            userId: req.user.userId,
-            openingCents,
-            notes: notes?.length ? notes : null,
-            registerNumber: normalizedRegister,
-        },
+        const normalizedRegister = registerNumber?.length ? registerNumber : null;
+        if (normalizedRegister) {
+            const registerInUse = await client_1.prisma.cashSession.findFirst({
+                where: { tenantId, registerNumber: normalizedRegister, closedAt: null },
+            });
+            if (registerInUse) {
+                throw new httpErrors_1.HttpError({
+                    status: 409,
+                    code: httpErrors_1.ErrorCodes.CONFLICT,
+                    message: "Ja existe um caixa aberto com essa numeracao para este tenant.",
+                });
+            }
+        }
+        return client_1.prisma.cashSession.create({
+            data: {
+                tenantId,
+                userId: req.user.userId,
+                openingCents,
+                notes: notes?.length ? notes : null,
+                registerNumber: normalizedRegister,
+            },
+        });
     });
     res.status(201).json({
         session,
@@ -92,12 +95,13 @@ exports.cashRouter.post("/open", ROLE_GUARD, async (req, res) => {
         },
     });
 });
-const readCurrentSession = async (tenantId) => client_1.prisma.cashSession.findFirst({
+const readCurrentSession = async (tenantId) => tenant_context_1.TenantContext.run(tenantId, () => client_1.prisma.cashSession.findFirst({
     where: { tenantId, closedAt: null },
     include: { withdrawals: { orderBy: { createdAt: "asc" } } },
-});
+}));
 const currentSessionHandler = async (req, res) => {
-    const session = await readCurrentSession(req.tenantId);
+    const tenantId = req.tenantId;
+    const session = await readCurrentSession(tenantId);
     res.json(session);
 };
 exports.cashRouter.get("/session", ROLE_GUARD, currentSessionHandler);
@@ -105,114 +109,122 @@ exports.cashRouter.get("/open", ROLE_GUARD, currentSessionHandler);
 exports.cashRouter.post("/withdraw", ROLE_GUARD, async (req, res) => {
     const { cashSessionId, amountCents, reason, supervisorSecret } = withdrawalSchema.parse(req.body);
     const tenantId = req.tenantId;
-    const session = await client_1.prisma.cashSession.findFirst({
-        where: { id: cashSessionId, tenantId, closedAt: null },
-    });
-    if (!session) {
-        throw new httpErrors_1.HttpError({
-            status: 404,
-            code: httpErrors_1.ErrorCodes.NOT_FOUND,
-            message: "Caixa não encontrado ou já encerrado.",
+    const { withdrawal, approval } = await tenant_context_1.TenantContext.run(tenantId, async () => {
+        const session = await client_1.prisma.cashSession.findFirst({
+            where: { id: cashSessionId, tenantId, closedAt: null },
         });
-    }
-    const secret = supervisorSecret ?? req.header("x-supervisor-secret") ?? undefined;
-    const approval = await (0, supervisorAuth_1.requireSupervisorApproval)(tenantId, secret, "Sangria de caixa");
-    const withdrawal = await client_1.prisma.cashWithdrawal.create({
-        data: {
-            tenantId,
-            cashSessionId,
-            amountCents,
-            reason,
-            createdById: req.user.userId,
-        },
+        if (!session) {
+            throw new httpErrors_1.HttpError({
+                status: 404,
+                code: httpErrors_1.ErrorCodes.NOT_FOUND,
+                message: "Caixa nao encontrado ou ja encerrado.",
+            });
+        }
+        const secret = supervisorSecret ?? req.header("x-supervisor-secret") ?? undefined;
+        const approval = await (0, supervisorAuth_1.requireSupervisorApproval)(tenantId, secret, "Sangria de caixa");
+        const withdrawal = await client_1.prisma.cashWithdrawal.create({
+            data: {
+                tenantId,
+                cashSessionId,
+                amountCents,
+                reason,
+                createdById: req.user.userId,
+            },
+        });
+        return { withdrawal, approval };
     });
     res.status(201).json({ ...withdrawal, approvedBy: approval });
 });
 exports.cashRouter.post("/close", ROLE_GUARD, async (req, res) => {
     const { cashSessionId, closingCents, supervisorSecret, notes } = closeSchema.parse(req.body);
     const tenantId = req.tenantId;
-    const session = await client_1.prisma.cashSession.findFirst({
-        where: { id: cashSessionId, tenantId },
-        include: { withdrawals: { orderBy: { createdAt: "asc" } } },
-    });
-    if (!session || session.closedAt) {
-        throw new httpErrors_1.HttpError({
-            status: 404,
-            code: httpErrors_1.ErrorCodes.NOT_FOUND,
-            message: "Sessão de caixa não encontrada ou já fechada.",
+    const enrichedSnapshot = await tenant_context_1.TenantContext.run(tenantId, async () => {
+        const session = await client_1.prisma.cashSession.findFirst({
+            where: { id: cashSessionId, tenantId },
+            include: { withdrawals: { orderBy: { createdAt: "asc" } } },
         });
-    }
-    const approval = await (0, supervisorAuth_1.requireSupervisorApproval)(tenantId, supervisorSecret, "Fechamento de caixa");
-    const closedAt = new Date();
-    const closingNotes = notes?.length ? notes : null;
-    const snapshot = await buildClosingSnapshot({
-        tenantId,
-        session,
-        closedAt,
-        closingCents,
-        closedByUserId: req.user.userId,
-        closingNotes,
-        supervisor: approval,
-    });
-    const printJob = await (0, service_1.enqueueCashClosingPrintJob)({
-        tenantId,
-        userId: req.user.userId,
-        cashSessionId: session.id,
-        snapshot,
-    });
-    const enrichedSnapshot = {
-        ...snapshot,
-        printJobId: printJob.id,
-        printJobStatus: printJob.status,
-    };
-    await client_1.prisma.cashSession.update({
-        where: { id: session.id },
-        data: {
-            closingCents,
+        if (!session || session.closedAt) {
+            throw new httpErrors_1.HttpError({
+                status: 404,
+                code: httpErrors_1.ErrorCodes.NOT_FOUND,
+                message: "Sessao de caixa nao encontrada ou ja fechada.",
+            });
+        }
+        const approval = await (0, supervisorAuth_1.requireSupervisorApproval)(tenantId, supervisorSecret, "Fechamento de caixa");
+        const closedAt = new Date();
+        const closingNotes = notes?.length ? notes : null;
+        const snapshot = await buildClosingSnapshot({
+            tenantId,
+            session,
             closedAt,
+            closingCents,
             closedByUserId: req.user.userId,
-            closingSupervisorId: approval.approverId,
-            closingSupervisorRole: approval.approverRole,
-            closingApprovalVia: approval.via,
-            closingSnapshot: enrichedSnapshot,
             closingNotes,
-        },
+            supervisor: approval,
+        });
+        const printJob = await (0, service_1.enqueueCashClosingPrintJob)({
+            tenantId,
+            userId: req.user.userId,
+            cashSessionId: session.id,
+            snapshot,
+        });
+        const enriched = {
+            ...snapshot,
+            printJobId: printJob.id,
+            printJobStatus: printJob.status,
+        };
+        await client_1.prisma.cashSession.update({
+            where: { id: session.id },
+            data: {
+                closingCents,
+                closedAt,
+                closedByUserId: req.user.userId,
+                closingSupervisorId: approval.approverId,
+                closingSupervisorRole: approval.approverRole,
+                closingApprovalVia: approval.via,
+                closingSnapshot: enriched,
+                closingNotes,
+            },
+        });
+        return enriched;
     });
     res.json(enrichedSnapshot);
 });
 exports.cashRouter.get("/:cashSessionId/report", ROLE_GUARD, async (req, res) => {
     const { cashSessionId } = sessionParamSchema.parse(req.params);
     const tenantId = req.tenantId;
-    const session = await client_1.prisma.cashSession.findFirst({
-        where: { id: cashSessionId, tenantId },
-        include: { withdrawals: { orderBy: { createdAt: "asc" } } },
-    });
-    if (!session || !session.closedAt || session.closingCents === null) {
-        throw new httpErrors_1.HttpError({
-            status: 409,
-            code: httpErrors_1.ErrorCodes.CONFLICT,
-            message: "Este caixa ainda não foi encerrado.",
+    const snapshot = await tenant_context_1.TenantContext.run(tenantId, async () => {
+        const session = await client_1.prisma.cashSession.findFirst({
+            where: { id: cashSessionId, tenantId },
+            include: { withdrawals: { orderBy: { createdAt: "asc" } } },
         });
-    }
-    if (session.closingSnapshot) {
-        return res.json(session.closingSnapshot);
-    }
-    const fallbackSnapshot = await buildClosingSnapshot({
-        tenantId,
-        session,
-        closedAt: session.closedAt,
-        closingCents: session.closingCents,
-        closedByUserId: session.closedByUserId ?? session.userId,
-        closingNotes: session.closingNotes ?? null,
-        supervisor: session.closingSupervisorId
-            ? {
-                approverId: session.closingSupervisorId,
-                approverRole: session.closingSupervisorRole ?? "ADMIN",
-                via: session.closingApprovalVia ?? "PIN",
-            }
-            : undefined,
+        if (!session || !session.closedAt || session.closingCents === null) {
+            throw new httpErrors_1.HttpError({
+                status: 409,
+                code: httpErrors_1.ErrorCodes.CONFLICT,
+                message: "Este caixa ainda nao foi encerrado.",
+            });
+        }
+        if (session.closingSnapshot) {
+            return session.closingSnapshot;
+        }
+        return buildClosingSnapshot({
+            tenantId,
+            session,
+            closedAt: session.closedAt,
+            closingCents: session.closingCents,
+            closedByUserId: session.closedByUserId ?? session.userId,
+            closingNotes: session.closingNotes ?? null,
+            supervisor: session.closingSupervisorId
+                ? {
+                    approverId: session.closingSupervisorId,
+                    approverRole: session.closingSupervisorRole ?? "ADMIN",
+                    via: session.closingApprovalVia ?? "PIN",
+                }
+                : undefined,
+        });
     });
-    res.json(fallbackSnapshot);
+    res.json(snapshot);
 });
 async function buildClosingSnapshot(input) {
     const { tenantId, session, closedAt, closingCents, closedByUserId, closingNotes, supervisor } = input;

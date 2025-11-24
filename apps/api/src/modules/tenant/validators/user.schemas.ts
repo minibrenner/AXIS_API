@@ -19,11 +19,22 @@ const pinSchema = z
   .min(4, "pinSupervisor minimo 4 caracteres")
   .max(32, "pinSupervisor maximo 32 caracteres");
 
+const digitsOnly = (value: unknown) => String(value ?? "").replace(/\D/g, "");
+
+const cpfSchema = z
+  .string()
+  .transform(digitsOnly)
+  .refine((v) => v.length === 0 || v.length === 11, {
+    message: "CPF deve ter 11 digitos",
+  })
+  .transform((v) => (v.length === 0 ? undefined : v));
+
 // Payload aceito na criacao de usuarios: campos obrigatorios + flags opcionais.
 export const createUserSchema = z.object({
   email: z.string().email("email invalido"),
   password: z.string().min(6, "password minimo 6 caracteres"),
   name: z.string().min(2).optional(),
+  cpf: cpfSchema.optional(),
   role: roleInput.optional(),
   isActive: z.boolean().optional(),
   mustChangePassword: z.boolean().optional(),
@@ -35,6 +46,7 @@ export const updateUserSchema = z.object({
   email: z.string().email("email invalido").optional(),
   password: z.string().min(6, "password minimo 6 caracteres").optional(),
   name: z.string().min(2).optional(),
+  cpf: cpfSchema.optional(),
   role: roleInput.optional(),
   isActive: z.boolean().optional(),
   mustChangePassword: z.boolean().optional(),

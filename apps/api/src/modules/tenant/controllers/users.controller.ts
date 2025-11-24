@@ -12,6 +12,7 @@ import type { CreateUserInput, UpdateUserInput } from "../validators/user.schema
 const userSelectSafe = {
   id: true,
   tenantId: true,
+  cpf: true,
   email: true,
   name: true,
   role: true,
@@ -140,7 +141,8 @@ export const createUser = async (req: Request, res: Response) => {
   const tenantId = requireTenantId(req, res);
   if (!tenantId) return;
 
-  const { email, password, name, role, isActive, mustChangePassword, pinSupervisor } = req.body as CreateUserInput;
+  const { email, password, name, role, isActive, mustChangePassword, pinSupervisor, cpf } =
+    req.body as CreateUserInput & { cpf?: string };
   const isBootstrap = req.isBootstrapOwnerCreation === true;
 
   try {
@@ -159,6 +161,7 @@ export const createUser = async (req: Request, res: Response) => {
       data: {
         tenantId,
         email,
+        ...(cpf ? { cpf } : {}),
         passwordHash,
         name,
         role: normalizedRole,
@@ -249,11 +252,13 @@ export const updateUser = async (req: Request, res: Response) => {
   if (!tenantId) return;
 
   const { id } = req.params;
-  const { email, password, name, role, isActive, mustChangePassword, pinSupervisor } = req.body as UpdateUserInput;
+  const { email, password, name, role, isActive, mustChangePassword, pinSupervisor, cpf } =
+    req.body as UpdateUserInput & { cpf?: string };
 
   const data: Record<string, unknown> = {};
   if (email !== undefined) data.email = email;
   if (name !== undefined) data.name = name;
+  if (cpf !== undefined) data.cpf = cpf;
   if (role !== undefined) {
     const normalizedRole = normalizeRole(role);
     if (!ensureRoleAssignmentPermission(req, res, normalizedRole, false)) {

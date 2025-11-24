@@ -12,14 +12,16 @@ async function listProducts(tenantId, q) {
         where: {
             tenantId,
             isActive: true,
-            OR: q ? [
-                { name: { contains: q, mode: "insensitive" } },
-                { barcode: { equals: q } },
-                { sku: { equals: q } }
-            ] : undefined
+            OR: q
+                ? [
+                    { name: { contains: q, mode: "insensitive" } },
+                    { barcode: { equals: q } },
+                    { sku: { equals: q } },
+                ]
+                : undefined,
         },
         orderBy: { name: "asc" },
-        take: 100
+        take: 100,
     });
 }
 async function createProduct(tenantId, data) {
@@ -41,7 +43,9 @@ async function createProduct(tenantId, data) {
             cest: data.cest,
             csosn: data.csosn,
             cfop: data.cfop,
-        }
+            isActive: data.isActive ?? undefined,
+            imagePath: data.imagePath,
+        },
     });
 }
 async function updateProduct(tenantId, id, data) {
@@ -49,12 +53,18 @@ async function updateProduct(tenantId, id, data) {
     const cost = data.cost ? String(data.cost).replace(",", ".") : undefined;
     const minStock = data.minStock ? String(data.minStock).replace(",", ".") : undefined;
     return client_1.prisma.product.update({
-        where: { id },
-        data: { ...data, price, cost, minStock },
+        where: { id, tenantId },
+        data: {
+            ...data,
+            price,
+            cost,
+            minStock,
+            imagePath: data.imagePath,
+        },
     });
 }
 async function softDeleteProduct(tenantId, id) {
-    return client_1.prisma.product.update({ where: { id }, data: { isActive: false } });
+    return client_1.prisma.product.update({ where: { id, tenantId }, data: { isActive: false } });
 }
 async function getProduct(tenantId, id) {
     return client_1.prisma.product.findFirst({ where: { id, tenantId } });

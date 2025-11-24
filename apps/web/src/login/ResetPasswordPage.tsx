@@ -81,10 +81,10 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <div className={`axis-root axis-${theme}`}>
-      <header className="axis-topbar">
+    <div className={`axis-login-root axis-${theme}`}>
+      <header className="axis-login-topbar">
         <button
-          className="axis-toggle"
+          className="axis-login-toggle"
           type="button"
           onClick={() => setTheme(isDark ? "light" : "dark")}
         >

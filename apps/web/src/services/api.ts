@@ -1,82 +1,36 @@
-const configuredApiUrl =
-  typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
-    ? String(import.meta.env.VITE_API_URL)
-    : "";
+import { API_URL } from "./config";
+import { apiClient } from "./http";
 
-const apiBase = configuredApiUrl || "http://localhost:3000/api";
-
-export const API_URL = apiBase.replace(/\/$/, "");
-
-const defaultHeaders = { "Content-Type": "application/json" } as const;
-
-const defaultNetworkErrorMessage =
-  "Não foi possível conectar com a API. Verifique se o backend está ativo e se o domínio deste front-end foi liberado no CORS.";
-
-async function safeFetch(
-  input: RequestInfo,
-  init?: RequestInit,
-  networkErrorMessage?: string,
-): Promise<Response> {
-  try {
-    return await fetch(input, init);
-  } catch (error) {
-    const err = new Error(networkErrorMessage ?? defaultNetworkErrorMessage);
-    (err as { cause?: unknown }).cause = error;
-    throw err;
-  }
-}
-
-const readPayload = async <T>(res: Response): Promise<T> => {
-  const raw = await res.text();
-  if (!raw) {
-    return null as T;
-  }
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null as T;
-  }
-};
-
-export type AuthTokens = { access: string; refresh: string };
 export type SuperAdminTokens = { token: string; tokenType: string; expiresIn: string };
 
-export async function login(email: string, password: string): Promise<AuthTokens> {
-  const res = await safeFetch(
-    `${API_URL}/auth/login`,
-    {
-      method: "POST",
-      headers: defaultHeaders,
-      body: JSON.stringify({ email, password }),
-    },
-    "Não foi possível alcançar a API de autenticação. Verifique se o backend e o CORS estão configurados.",
-  );
-  const payload = await readPayload<AuthTokens & { message?: string }>(res);
-
-  if (!res.ok) {
-    const details =
-      typeof payload?.message === "string"
-        ? payload.message
-        : "Login falhou";
-    throw new Error(details);
+export async function login(email: string, password: string) {
+  try {
+    const res = await apiClient.post<{ access: string }>(
+      "/auth/login",
+      { email, password },
+    );
+    if (!res.data?.access) {
+      throw new Error("Resposta inesperada da API de login.");
+    }
+    return { access: res.data.access };
+  } catch (error) {
+    const err = error as { response?: { data?: { message?: string } } };
+    const message =
+      err.response?.data?.message ??
+      "Nǜo foi poss��vel alcan��ar a API de autentica��ǜo. Verifique se o backend e o CORS estǜo configurados.";
+    throw new Error(message);
   }
-  if (!payload) {
-    throw new Error("Resposta inesperada da API de login.");
-  }
-  return { access: payload.access, refresh: payload.refresh };
 }
 
 export async function loginSuperAdmin(email: string, password: string): Promise<SuperAdminTokens> {
-  const res = await safeFetch(
-    `${API_URL}/super-admin/login`,
-    {
-      method: "POST",
-      headers: defaultHeaders,
-      body: JSON.stringify({ email, password }),
-    },
-    "Não foi possível conectar com a API de super admin. Verifique se o backend está ativo e se o CORS permite este domínio.",
-  );
-  const payload = await readPayload<SuperAdminTokens & { message?: string }>(res);
+  const res = await fetch(`${API_URL}/super-admin/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const payload = await res
+    .json()
+    .catch(() => null) as (SuperAdminTokens & { message?: string }) | null;
 
   if (!res.ok) {
     const details =
@@ -91,28 +45,23 @@ export async function loginSuperAdmin(email: string, password: string): Promise<
   return payload;
 }
 
-export async function fetchCurrentUser(access: string) {
-  const res = await fetch(`${API_URL}/auth/me`, {
-    headers: { Authorization: `Bearer ${access}` },
-  });
-  if (!res.ok) {
-    throw new Error("Não foi possível obter os dados do usuário.");
-  }
-  return res.json();
+export async function fetchCurrentUser() {
+  const res = await apiClient.get("/auth/me");
+  return res.data;
 }
 
 export async function requestPasswordReset(email: string) {
   const res = await fetch(`${API_URL}/auth/forgot-password`, {
     method: "POST",
-    headers: defaultHeaders,
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
   });
   if (!res.ok) {
-    const payload = await readPayload<{ message?: string }>(res);
+    const payload = (await res.json().catch(() => null)) as { message?: string } | null;
     throw new Error(
       typeof payload?.message === "string"
         ? payload.message
-        : "Não foi possível iniciar o reset.",
+        : "Nǜo foi poss��vel iniciar o reset.",
     );
   }
 }
@@ -120,15 +69,15 @@ export async function requestPasswordReset(email: string) {
 export async function resetPassword(token: string, newPassword: string) {
   const res = await fetch(`${API_URL}/auth/reset-password`, {
     method: "POST",
-    headers: defaultHeaders,
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, newPassword }),
   });
   if (!res.ok) {
-    const payload = await readPayload<{ message?: string }>(res);
+    const payload = (await res.json().catch(() => null)) as { message?: string } | null;
     throw new Error(
       typeof payload?.message === "string"
         ? payload.message
-        : "Não foi possível redefinir a senha.",
+        : "Nǜo foi poss��vel redefinir a senha.",
     );
   }
 }
@@ -188,7 +137,7 @@ function getStoredSuperAdminToken(): string | null {
 async function saFetch(token: string | null, path: string, options: RequestInit = {}) {
   const resolvedToken = token ?? getStoredSuperAdminToken();
   if (!resolvedToken) {
-    throw new Error("Token de super admin ausente. Faça login novamente.");
+    throw new Error("Token de super admin ausente. Fa��a login novamente.");
   }
 
   const res = await fetch(`${API_URL}/super-admin${path}`, {
@@ -201,7 +150,7 @@ async function saFetch(token: string | null, path: string, options: RequestInit 
   });
   if (res.status === 401) {
     localStorage.removeItem("axis.superadmin.token");
-    throw new Error("Sessão de super admin expirou. Faça login novamente.");
+    throw new Error("Sessǜo de super admin expirou. Fa��a login novamente.");
   }
   return res;
 }
@@ -209,7 +158,7 @@ async function saFetch(token: string | null, path: string, options: RequestInit 
 export async function fetchSuperAdminOverview(token: string): Promise<SuperAdminMetrics> {
   const res = await saFetch(token, "/overview");
   if (!res.ok) {
-    throw new Error("Não foi possível obter os indicadores do super admin.");
+    throw new Error("Nǜo foi poss��vel obter os indicadores do super admin.");
   }
   return res.json();
 }
@@ -236,7 +185,7 @@ export async function createTenantAsSuperAdmin(
 export async function fetchTenantsAsSuperAdmin(token: string): Promise<Tenant[]> {
   const res = await saFetch(token, "/tenants");
   if (!res.ok) {
-    throw new Error("Não foi possível obter a lista de tenants.");
+    throw new Error("Nǜo foi poss��vel obter a lista de tenants.");
   }
   return res.json();
 }
@@ -273,7 +222,7 @@ export async function createTenantUserAsSuperAdmin(
   const { tenantIdentifier, ...rest } = payload;
   const identifier = tenantIdentifier?.trim();
   if (!identifier) {
-    throw new Error("Tenant identifier obrigat��rio para criar usuǭrio.");
+    throw new Error("Tenant identifier obrigat������rio para criar usu��rio.");
   }
 
   const res = await saFetch(token, `/tenants/${identifier}/users`, {
@@ -282,7 +231,7 @@ export async function createTenantUserAsSuperAdmin(
   });
   if (!res.ok) {
     const data = await parseJson(res);
-    throw new Error(data?.message ?? "Falha ao criar usuário para o tenant.");
+    throw new Error(data?.message ?? "Falha ao criar usuǭrio para o tenant.");
   }
 }
 
@@ -334,8 +283,65 @@ export async function fetchCashClosingReport(access: string, cashSessionId: stri
   });
 
   if (!res.ok) {
-    throw new Error("Falha ao buscar relatório de fechamento de caixa.");
+    throw new Error("Falha ao buscar relat��rio de fechamento de caixa.");
   }
 
   return res.json();
 }
+
+// =======================
+// CATEGORIAS (PAINEL ADMIN)
+// =======================
+
+export type Category = {
+  id: string;
+  tenantId: string;
+  name: string;
+  imagePath: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listCategories(): Promise<Category[]> {
+  const response = await apiClient.get<Category[]>("/categories");
+  return response.data;
+}
+
+export async function createCategory(
+  name: string,
+  imageFile?: File | null,
+): Promise<Category> {
+  const formData = new FormData();
+  formData.append("name", name);
+  if (imageFile) {
+    formData.append("image", imageFile);
+  }
+
+  const response = await apiClient.post<Category>("/categories", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
+  return response.data;
+}
+
+export async function updateCategory(
+  id: string,
+  params: { name: string; imageFile?: File | null },
+): Promise<Category> {
+  const formData = new FormData();
+  formData.append("name", params.name);
+  if (params.imageFile) {
+    formData.append("image", params.imageFile);
+  }
+
+  const response = await apiClient.put<Category>(`/categories/${id}`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
+  return response.data;
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  await apiClient.delete(`/categories/${id}`);
+}
+

@@ -4,7 +4,6 @@ exports.syncRouter = void 0;
 const express_1 = require("express");
 const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
-const middleware_1 = require("../auth/middleware");
 const client_2 = require("../prisma/client");
 const saleSchema = zod_1.z.object({
     saleId: zod_1.z.string(), // idempotência
@@ -13,7 +12,6 @@ const saleSchema = zod_1.z.object({
     items: zod_1.z.array(zod_1.z.object({ productId: zod_1.z.string(), locationId: zod_1.z.string(), qty: zod_1.z.coerce.number().positive() })),
 });
 exports.syncRouter = (0, express_1.Router)();
-exports.syncRouter.use((0, middleware_1.jwtAuth)());
 exports.syncRouter.post("/sale", async (req, res) => {
     const { saleId, items, deviceId, createdAt } = saleSchema.parse(req.body);
     const tenantId = req.user.tenantId;

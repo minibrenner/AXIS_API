@@ -1,5 +1,3 @@
-﻿import type { AuthTokens } from "../services/api";
-
 const TOKEN_KEY = "axis.auth.tokens";
 const TENANT_KEY = "axis.auth.tenantId";
 const USER_KEY = "axis.auth.user";
@@ -15,7 +13,11 @@ export type AxisCurrentUser = {
   name?: string | null;
 };
 
+export type AuthTokens = { access: string };
+
 type DecodedToken = { tid?: string };
+
+let inMemoryAccessToken: string | null = null;
 
 const safeParse = <T>(value: string | null) => {
   if (!value) return null;
@@ -38,6 +40,7 @@ const decodeJwt = (token: string) => {
 };
 
 export function storeTokens(tokens: AuthTokens) {
+  inMemoryAccessToken = tokens.access;
   localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
   localStorage.setItem(TIMESTAMP_KEY, new Date().toISOString());
 
@@ -53,16 +56,36 @@ export function storeCurrentUser(user: AxisCurrentUser) {
 }
 
 export const clearSession = () => {
+  inMemoryAccessToken = null;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TENANT_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(TIMESTAMP_KEY);
 };
 
+export const setAccessToken = (token: string | null) => {
+  inMemoryAccessToken = token;
+  if (!token) {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+};
+
 export const getStoredTokens = (): AuthTokens | null =>
   safeParse<AuthTokens>(localStorage.getItem(TOKEN_KEY));
 
-export const getAccessToken = () => getStoredTokens()?.access ?? "";
+export const getAccessToken = () => {
+  if (inMemoryAccessToken) {
+    return inMemoryAccessToken;
+  }
+
+  const stored = getStoredTokens();
+  if (stored?.access) {
+    inMemoryAccessToken = stored.access;
+    return stored.access;
+  }
+
+  return "";
+};
 
 export const getTenantId = () => localStorage.getItem(TENANT_KEY) ?? "";
 

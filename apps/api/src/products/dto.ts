@@ -13,6 +13,7 @@ export const createProductSchema = z.object({
   cest: z.string().optional(),
   csosn: z.string().optional(),
   cfop: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export const updateProductSchema = createProductSchema.partial();

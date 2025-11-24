@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { StatementPdfService } from "./statement.pdf.service";
 import { LedgerService } from "./ledger.service";
+import { TenantContext } from "../tenancy/tenant.context";
 
 export const statementPdfRouter = Router();
 const pdf = new StatementPdfService();
@@ -9,7 +10,12 @@ const ledger = new LedgerService();
 statementPdfRouter.get("/:id/ledger/statement.pdf", async (req, res) => {
   const from = req.query.from ? new Date(String(req.query.from)) : undefined;
   const to = req.query.to ? new Date(String(req.query.to)) : undefined;
-  const data = await ledger.statement(req.params.id, from, to);
+  const tenantId = req.user!.tenantId;
+
+  const data = await TenantContext.run(tenantId, () =>
+    ledger.statement(req.params.id, from, to),
+  );
+
   const items = data.items.map((item) => ({
     createdAt: item.createdAt,
     type: item.type,

@@ -7,6 +7,7 @@ const rbac_1 = require("../security/rbac");
 const dto_1 = require("./dto");
 const sales_service_1 = require("./sales.service");
 const receipt_1 = require("./receipt");
+const tenant_context_1 = require("../tenancy/tenant.context");
 const createSaleSchema = zod_1.z.object({
     sale: dto_1.saleSchema,
     supervisorSecret: zod_1.z.string().optional(),
@@ -21,14 +22,15 @@ exports.salesRouter.post("/", (0, rbac_1.allowRoles)("ADMIN", "OWNER", "ATTENDAN
     const { sale, supervisorSecret, idempotencyKey } = createSaleSchema.parse(req.body);
     const headerSecret = req.header("x-supervisor-secret") ?? undefined;
     const headerIdempotency = req.header("x-idempotency-key") ?? undefined;
-    const response = await (0, sales_service_1.createSale)({
-        tenantId: req.user.tenantId,
+    const tenantId = req.user.tenantId;
+    const response = await tenant_context_1.TenantContext.run(tenantId, () => (0, sales_service_1.createSale)({
+        tenantId,
         userId: req.user.userId,
         userRole: req.user.role,
         body: sale,
         supervisorSecret: supervisorSecret ?? headerSecret,
         idempotencyKey: idempotencyKey ?? headerIdempotency,
-    });
+    }));
     if ("duplicate" in response) {
         return res.status(200).json(response);
     }
@@ -38,17 +40,19 @@ exports.salesRouter.post("/:saleId/cancel", (0, rbac_1.allowRoles)("ADMIN", "OWN
     const { saleId } = req.params;
     const body = cancelSchema.parse(req.body ?? {});
     const supervisorSecret = body.supervisorSecret ?? req.header("x-supervisor-secret") ?? undefined;
-    const sale = await (0, sales_service_1.cancelSale)({
-        tenantId: req.user.tenantId,
+    const tenantId = req.user.tenantId;
+    const sale = await tenant_context_1.TenantContext.run(tenantId, () => (0, sales_service_1.cancelSale)({
+        tenantId,
         userId: req.user.userId,
         saleId,
         reason: body.reason,
         approvalSecret: supervisorSecret,
-    });
+    }));
     return res.json(sale);
 });
 exports.salesRouter.get("/:saleId/receipt", (0, rbac_1.allowRoles)("ADMIN", "OWNER", "ATTENDANT"), async (req, res) => {
-    const payload = await (0, receipt_1.buildReceipt)(req.user.tenantId, req.params.saleId);
+    const tenantId = req.user.tenantId;
+    const payload = await tenant_context_1.TenantContext.run(tenantId, () => (0, receipt_1.buildReceipt)(tenantId, req.params.saleId));
     return res.json(payload);
 });
 exports.default = exports.salesRouter;

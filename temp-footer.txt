@@ -1,0 +1,33 @@
+<div className="axis-form-actions">
+                  <button
+                    type="button"
+                    className="axis-button-secondary"
+                    onClick={closeModal}
+                    disabled={isSubmitting}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="axis-admin-button-primary"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting
+                      ? "Salvando..."
+                      : modalMode === "create"
+                        ? "Salvar produto"
+                        : "Salvar alterações"}
+                  </button>
+                  {modalMode === "edit" && editingProduct && (
+                    <button
+                      type="button"
+                      className="axis-button-secondary axis-button-danger"
+                      onClick={handleDeleteFromModal}
+                      disabled={isSubmitting}
+                    >
+                      EXCLUIR
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div

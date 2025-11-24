@@ -20,7 +20,6 @@ type ConsolidatedItem = {
 type TxClient = Omit<typeof prisma, "$extends" | "$connect" | "$disconnect" | "$on" | "$transaction">;
 
 export const syncRouter = Router();
-syncRouter.use(jwtAuth());
 
 syncRouter.post("/sale", async (req, res) => {
   const { saleId, items, deviceId, createdAt } = saleSchema.parse(req.body);
