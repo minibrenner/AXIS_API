@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Prisma, ProcessedSaleStatus } from "@prisma/client";
 import { z } from "zod";
-import { jwtAuth } from "../auth/middleware";
+
 import { prisma } from "../prisma/client";
 
 const saleSchema = z.object({

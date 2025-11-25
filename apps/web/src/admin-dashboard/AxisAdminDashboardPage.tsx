@@ -7,9 +7,15 @@ import {
   getCurrentUser,
   hasAdminAccess,
 } from "../auth/session";
-import AxisCategoriesPageContent from "./AxisCategoriesPageContent";
-import AxisProductsPageContent from "./AxisProductsPageContent";
-import AxisUsersPageContent from "./AxisUsersPageContent";
+import AxisCategoriesPageContent from "./categories/AxisCategoriesPageContent";
+import AxisClientsPageContent from "./clients/AxisClientsPageContent";
+import ClientsLogoIcon from "./clients/ClientsLogoIcon";
+import AxisProductsPageContent from "./products/AxisProductsPageContent";
+import AxisUsersPageContent from "./users/AxisUsersPageContent";
+import AxisStockDepositsPageContent from "./estoque/AxisStockDepositsPageContent";
+import AxisStockBalancesPageContent from "./estoque/AxisStockBalancesPageContent";
+import AxisStockTransferPageContent from "./estoque/AxisStockTransferPageContent";
+import AxisStockMovementsPageContent from "./estoque/AxisStockMovementsPageContent";
 
 type Theme = "dark" | "light";
 type NavGroupId =
@@ -26,7 +32,16 @@ type NavGroupId =
   | "config";
 
 
-type MainSection = "dashboard" | "categories" | "products" | "users";
+type MainSection =
+  | "dashboard"
+  | "categories"
+  | "products"
+  | "users"
+  | "clients"
+  | "stock"
+  | "balances"
+  | "transfer"
+  | "movements";
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -411,6 +426,42 @@ export function AxisAdminDashboardPage() {
               </ul>
             </div>
 
+            {/* CLIENTES */}
+            <div
+              className={`axis-nav-group ${
+                isGroupOpen("clientes") ? "open" : ""
+              }`}
+              data-group="clientes"
+            >
+              <button
+                className="axis-nav-parent"
+                type="button"
+                onClick={() => toggleGroup("clientes")}
+              >
+                <div className="axis-nav-parent-main">
+                  <div className="axis-nav-icon">
+                    <ClientsLogoIcon size={14} />
+                  </div>
+                  <span className="axis-nav-parent-label">Clientes</span>
+                </div>
+                <span className="axis-nav-parent-chevron"></span>
+              </button>
+              <ul className="axis-nav-children">
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("clients");
+                    setOpenGroups((prev) =>
+                      prev.includes("clientes") ? prev : [...prev, "clientes"],
+                    );
+                  }}
+                >
+                  <span>Listar / Cadastrar / Editar</span>
+                  <small>Gerenciar clientes</small>
+                </li>
+              </ul>
+            </div>
+
             {/* DEMAIS GRUPOS (simplificados) */}
             <div
               className={`axis-nav-group ${
@@ -471,6 +522,48 @@ export function AxisAdminDashboardPage() {
                 </div>
                 <span className="axis-nav-parent-chevron">›</span>
               </button>
+              <ul className="axis-nav-children">
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("stock");
+                    setOpenGroups((prev) => (prev.includes("estoque") ? prev : [...prev, "estoque"]));
+                  }}
+                >
+                  <span>Deposito</span>
+                  <small>Criar / editar / excluir</small>
+                </li>
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("balances");
+                    setOpenGroups((prev) => (prev.includes("estoque") ? prev : [...prev, "estoque"]));
+                  }}
+                >
+                  <span>Saldos</span>
+                  <small>Por estoque / Total</small>
+                </li>
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("movements");
+                    setOpenGroups((prev) => (prev.includes("estoque") ? prev : [...prev, "estoque"]));
+                  }}
+                >
+                  <span>Historico de movimentacoes</span>
+                  <small>Entradas, saidas e ajustes</small>
+                </li>
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("transfer");
+                    setOpenGroups((prev) => (prev.includes("estoque") ? prev : [...prev, "estoque"]));
+                  }}
+                >
+                  <span>Movimentacao entre estoques</span>
+                  <small>Transferir produtos entre depositos</small>
+                </li>
+              </ul>
             </div>
 
             <div
@@ -514,6 +607,16 @@ export function AxisAdminDashboardPage() {
             <AxisProductsPageContent />
           ) : mainSection === "users" ? (
             <AxisUsersPageContent />
+          ) : mainSection === "clients" ? (
+            <AxisClientsPageContent />
+          ) : mainSection === "stock" ? (
+            <AxisStockDepositsPageContent />
+          ) : mainSection === "balances" ? (
+            <AxisStockBalancesPageContent />
+          ) : mainSection === "transfer" ? (
+            <AxisStockTransferPageContent />
+          ) : mainSection === "movements" ? (
+            <AxisStockMovementsPageContent />
           ) : (
             <>
               <header className="axis-dashboard-header">

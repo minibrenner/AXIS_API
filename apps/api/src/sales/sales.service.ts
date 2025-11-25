@@ -3,7 +3,7 @@ import { BadRequest } from "../utils/httpErrors";
 import { prisma } from "../prisma/client";
 import { DiscountInput, SaleInput, SaleItemInput, saleSchema } from "./dto";
 import { nextSaleNumber } from "./number.service";
-import { stockOut, cancelSale as stockCancel } from "../stock/service";
+import { cancelSale as stockCancel, selectInventoryForSale, stockOut } from "../stock/service";
 import { getFiscalAdapter } from "../fiscal/adapter";
 import { trackFiscalAttempt } from "../fiscal/service";
 import { requireSupervisorApproval } from "../security/supervisorAuth";
@@ -38,12 +38,16 @@ type CreateSaleResult = {
   sale: SaleWithRelations;
   fiscalStatus?: FiscalStatus;
   fiscalError?: string;
-  stockWarnings?: Array<{ productId: string; locationId: string; balance: string }>;
+  stockWarnings?: StockWarning[];
+  stockErrors?: StockError[];
 };
 
 export type CreateSaleResponse = CreateSaleResult | { duplicate: true };
 
 const ZERO_DISCOUNT = { amount: 0, mode: DiscountMode.NONE } as const;
+
+type StockWarning = { productId: string; locationId: string; balance: string };
+type StockError = { productId: string; locationId?: string; message: string };
 
 function computeLineTotal(qty: number, unitPriceCents: number): number {
   return Math.round(qty * unitPriceCents);
@@ -96,6 +100,66 @@ function normalizeItems(items: SaleItemInput[]): ComputedItem[] {
       discountMode: discountInfo.mode,
     };
   });
+}
+
+async function handleSaleStockMovements({
+  tenantId,
+  userId,
+  items,
+  saleId,
+  preferredLocationId,
+}: {
+  tenantId: string;
+  userId: string;
+  items: ComputedItem[];
+  saleId: string;
+  preferredLocationId?: string;
+}): Promise<{ stockWarnings?: StockWarning[]; stockErrors?: StockError[] }> {
+  const stockWarnings: StockWarning[] = [];
+  const stockErrors: StockError[] = [];
+
+  for (const item of items) {
+    const selection = await selectInventoryForSale(tenantId, item.productId, preferredLocationId);
+
+    if (!selection) {
+      stockErrors.push({
+        productId: item.productId,
+        message: "Nenhum inventario encontrado para debito de venda.",
+      });
+      continue;
+    }
+
+    try {
+      const movement = await stockOut({
+        tenantId,
+        userId,
+        productId: item.productId,
+        locationId: selection.locationId,
+        qty: item.qty,
+        reason: "Venda",
+        saleId,
+      });
+
+      if (movement.wentNegative) {
+        stockWarnings.push({
+          productId: item.productId,
+          locationId: selection.locationId,
+          balance: movement.quantity.toString(),
+        });
+      }
+    } catch (err: unknown) {
+      stockErrors.push({
+        productId: item.productId,
+        locationId: selection.locationId,
+        message: err instanceof Error ? err.message : "Falha ao debitar estoque.",
+      });
+    }
+  }
+
+  return {
+    stockWarnings: stockWarnings.length ? stockWarnings : undefined,
+    stockErrors: stockErrors.length ? stockErrors : undefined,
+  };
 }
 
 export async function createSale(options: CreateSaleOptions): Promise<CreateSaleResponse> {
@@ -155,7 +219,7 @@ export async function createSale(options: CreateSaleOptions): Promise<CreateSale
     }
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const txResult = await prisma.$transaction(async (tx) => {
     const cash = await tx.cashSession.findFirst({
       where: { id: cashSessionId, tenantId: options.tenantId, closedAt: null },
     });
@@ -202,30 +266,6 @@ export async function createSale(options: CreateSaleOptions): Promise<CreateSale
       include: { items: true, payments: true },
     });
 
-    const stockWarnings: Array<{ productId: string; locationId: string; balance: string }> = [];
-
-    await Promise.all(
-      normalizedItems.map(async (item) => {
-        const movement = await stockOut({
-          tenantId: options.tenantId,
-          userId: options.userId,
-          productId: item.productId,
-          locationId,
-          qty: item.qty,
-          reason: "Venda",
-          saleId: saleId ?? sale.id,
-        });
-
-        if (movement.wentNegative) {
-          stockWarnings.push({
-            productId: item.productId,
-            locationId,
-            balance: movement.quantity.toString(),
-          });
-        }
-      })
-    );
-
     let fiscalStatus: FiscalStatus | undefined;
     let fiscalError: string | undefined;
 
@@ -261,11 +301,36 @@ export async function createSale(options: CreateSaleOptions): Promise<CreateSale
       sale,
       fiscalStatus,
       fiscalError,
-      stockWarnings: stockWarnings.length ? stockWarnings : undefined,
     };
   });
 
-  if (options.idempotencyKey && "sale" in result) {
+  let stockWarnings: StockWarning[] | undefined;
+  let stockErrors: StockError[] | undefined;
+
+  try {
+    ({ stockWarnings, stockErrors } = await handleSaleStockMovements({
+      tenantId: options.tenantId,
+      userId: options.userId,
+      items: normalizedItems,
+      saleId: saleId ?? txResult.sale.id,
+      preferredLocationId: locationId,
+    }));
+  } catch (err: unknown) {
+    stockErrors = [
+      {
+        productId: "*",
+        message: err instanceof Error ? err.message : "Falha inesperada ao debitar estoque.",
+      },
+    ];
+  }
+
+  const result: CreateSaleResult = {
+    ...txResult,
+    ...(stockWarnings ? { stockWarnings } : {}),
+    ...(stockErrors ? { stockErrors } : {}),
+  };
+
+  if (options.idempotencyKey && "sale" in txResult) {
     await prisma.auditLog.create({
       data: {
         tenantId: options.tenantId,

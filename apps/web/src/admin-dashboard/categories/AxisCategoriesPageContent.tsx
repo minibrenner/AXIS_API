@@ -11,7 +11,7 @@ import {
   deleteCategory,
   listCategories,
   updateCategory,
-} from "../services/api";
+} from "../../services/api";
 
 type Feedback = { kind: "error" | "success"; message: string } | null;
 type Mode = "create" | "edit";

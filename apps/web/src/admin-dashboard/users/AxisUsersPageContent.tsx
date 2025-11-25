@@ -1,10 +1,9 @@
 import type { FormEvent, MouseEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import axios, { type AxiosError } from "axios";
-import { apiClient } from "../services/http";
-import { AxisSearchInput } from "../components/elements/AxisSearchInput";
-import { type AxisRole, getTenantId } from "../auth/session";
-import "./search-bar-with-filter.css";
+import { apiClient } from "../../services/http";
+import { AxisSearchInput } from "../../components/elements/AxisSearchInput";
+import { type AxisRole, getTenantId } from "../../auth/session";
 
 export type TenantUser = {
   id: string;
@@ -455,9 +454,9 @@ export function AxisUsersPageContent() {
 
       <section className="axis-products-list">
         <div className="axis-products-list-header">
-          <span>Usuario</span>
-          <span>Email</span>
-          <span>Funcao</span>
+          <span>Usuario | </span>
+          <span>Email | </span>
+          <span>Funcao | </span>
           <span>Status</span>
         </div>
 

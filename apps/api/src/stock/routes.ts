@@ -10,6 +10,7 @@ import {
   listStockMovements,
   getStockLevel,
   initializeInventory,
+  stockTransfer,
 } from "./service";
 import { prisma } from "../prisma/client";
 import { ErrorCodes, HttpError } from "../utils/httpErrors";
@@ -51,10 +52,29 @@ const initBulkBodySchema = z.object({
 
 const locationBodySchema = z.object({
   name: z.string().trim().min(2).max(80),
+  isSaleSource: z.coerce.boolean().optional(),
 });
 
 const locationParamSchema = z.object({
   locationId: z.string().cuid(),
+});
+
+const transferSchema = z
+  .object({
+    productId: z.string(),
+    fromLocationId: z.string(),
+    toLocationId: z.string(),
+    qty: z.coerce.number().positive(),
+    reason: z.string().optional(),
+  })
+  .refine((data) => data.fromLocationId !== data.toLocationId, {
+    message: "Origem e destino devem ser diferentes",
+    path: ["toLocationId"],
+  });
+
+const deleteInventorySchema = z.object({
+  productId: z.string(),
+  locationId: z.string(),
 });
 
 export const stockRouter = Router();
@@ -90,6 +110,57 @@ stockRouter.post("/adjust", allowRoles("ADMIN"), async (req, res) => {
   );
 
   res.json({ ok: true, quantity: result.quantity.toString(), wentNegative: result.wentNegative });
+});
+
+stockRouter.post("/transfer", allowRoles("ADMIN", "OWNER", "ATTENDANT"), async (req, res) => {
+  const tenantId = req.tenantId!;
+  const body = transferSchema.parse(req.body);
+
+  const result = await TenantContext.run(tenantId, async () =>
+    stockTransfer({
+      tenantId,
+      userId: req.user!.userId,
+      productId: body.productId,
+      fromLocationId: body.fromLocationId,
+      toLocationId: body.toLocationId,
+      qty: body.qty,
+      reason: body.reason,
+    }),
+  );
+
+  res.json({
+    ok: true,
+    from: {
+      locationId: result.from.locationId,
+      quantity: result.from.quantity.toString(),
+      wentNegative: result.from.wentNegative,
+    },
+    to: {
+      locationId: result.to.locationId,
+      quantity: result.to.quantity.toString(),
+    },
+  });
+});
+
+stockRouter.delete("/inventory", allowRoles("ADMIN", "OWNER"), async (req, res) => {
+  const tenantId = req.tenantId!;
+  const { productId, locationId } = deleteInventorySchema.parse(req.query);
+
+  const deleted = await TenantContext.run(tenantId, async () =>
+    prisma.inventory.deleteMany({
+      where: { tenantId, productId, locationId },
+    }),
+  );
+
+  if (deleted.count === 0) {
+    throw new HttpError({
+      status: 404,
+      code: ErrorCodes.NOT_FOUND,
+      message: "Inventario nao encontrado para este deposito/produto.",
+    });
+  }
+
+  res.status(204).send();
 });
 
 stockRouter.get("/", allowRoles("ADMIN", "ATTENDANT"), async (req, res) => {
@@ -181,12 +252,12 @@ stockRouter.get("/locations", allowRoles("ADMIN", "OWNER", "ATTENDANT"), async (
 
 stockRouter.post("/locations", allowRoles("ADMIN", "OWNER"), async (req, res) => {
   const tenantId = req.tenantId!;
-  const { name } = locationBodySchema.parse(req.body);
+  const { name, isSaleSource } = locationBodySchema.parse(req.body);
 
   try {
     const location = await TenantContext.run(tenantId, async () =>
       prisma.stockLocation.create({
-        data: { tenantId, name },
+        data: { tenantId, name, isSaleSource: isSaleSource ?? false },
       }),
     );
     res.status(201).json(location);
@@ -205,12 +276,12 @@ stockRouter.post("/locations", allowRoles("ADMIN", "OWNER"), async (req, res) =>
 stockRouter.put("/locations/:locationId", allowRoles("ADMIN", "OWNER"), async (req, res) => {
   const tenantId = req.tenantId!;
   const { locationId } = locationParamSchema.parse(req.params);
-  const { name } = locationBodySchema.parse(req.body);
+  const { name, isSaleSource } = locationBodySchema.parse(req.body);
 
   const updated = await TenantContext.run(tenantId, async () =>
     prisma.stockLocation.updateMany({
       where: { id: locationId, tenantId },
-      data: { name },
+      data: { name, isSaleSource: isSaleSource ?? false },
     }),
   );
 
@@ -236,13 +307,20 @@ stockRouter.delete("/locations/:locationId", allowRoles("ADMIN", "OWNER"), async
   const { locationId } = locationParamSchema.parse(req.params);
 
   try {
-    const removed = await TenantContext.run(tenantId, async () =>
-      prisma.stockLocation.deleteMany({
-        where: { id: locationId, tenantId },
+    const removedCount = await TenantContext.run(tenantId, async () =>
+      prisma.$transaction(async (tx) => {
+        await tx.stockMovement.deleteMany({ where: { tenantId, locationId } });
+        await tx.inventory.deleteMany({ where: { tenantId, locationId } });
+
+        const removed = await tx.stockLocation.deleteMany({
+          where: { id: locationId, tenantId },
+        });
+
+        return removed.count;
       }),
     );
 
-    if (removed.count === 0) {
+    if (removedCount === 0) {
       throw new HttpError({
         status: 404,
         code: ErrorCodes.NOT_FOUND,

@@ -75,4 +75,9 @@ export class CustomersService {
       },
     });
   }
+
+  async delete(id: string) {
+    await this.get(id);
+    return prisma.customer.delete({ where: { id } });
+  }
 }

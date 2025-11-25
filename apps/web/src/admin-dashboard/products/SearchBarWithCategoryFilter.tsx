@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./search-bar-with-filter.css";
-import { AxisSearchInput } from "../components/elements/AxisSearchInput";
+import { AxisSearchInput } from "../../components/elements/AxisSearchInput";
 
 type CategoryFilter = {
   id: string;

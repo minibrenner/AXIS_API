@@ -1,6 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { API_URL } from "./config";
-import { getAccessToken, clearSession, setAccessToken } from "../auth/session";
+import { getAccessToken, clearSession, setAccessToken, getTenantId } from "../auth/session";
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -11,14 +11,16 @@ apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAccessToken();
 
-    if (token) {
-      const headers = (config.headers ?? {}) as Record<string, unknown>;
-      // garante que o objeto headers de volta para o axios
-      config.headers = headers;
+    const headers = (config.headers ?? {}) as Record<string, unknown>;
+    config.headers = headers;
 
-      if (!headers.Authorization) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+    if (token && !headers.Authorization) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const tenantId = getTenantId();
+    if (tenantId && !headers["x-tenant-id"]) {
+      headers["x-tenant-id"] = tenantId;
     }
 
     return config;

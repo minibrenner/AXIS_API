@@ -35,3 +35,9 @@ customersRouter.patch("/:id", allowRoles("ADMIN"), withZod(updateCustomerSchema)
   const up = await TenantContext.run(tenantId, () => service.update(req.params.id, req.body));
   res.json(up);
 });
+
+customersRouter.delete("/:id", allowRoles("ADMIN"), async (req, res) => {
+  const tenantId = req.user!.tenantId;
+  await TenantContext.run(tenantId, () => service.delete(req.params.id));
+  res.status(204).send();
+});

@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 import axios, { type AxiosError } from "axios";
-import { apiClient } from "../services/http";
+import { apiClient } from "../../services/http";
 import { SearchBarWithCategoryFilter } from "./SearchBarWithCategoryFilter";
 
 const assetsBaseUrl =
@@ -616,10 +616,10 @@ export function AxisProductsPageContent() {
 
       <section className="axis-products-list">
         <div className="axis-products-list-header">
-          <span>Produto</span>
-          <span>Valor</span>
-          <span>Categoria</span>
-          <span>Unidade</span>
+          <span>Produto | </span>
+          <span>Valor | </span>
+          <span>Categoria | </span>
+          <span>Unidade | </span>
           <span>Status</span>
         </div>
 

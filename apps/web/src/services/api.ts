@@ -345,3 +345,131 @@ export async function deleteCategory(id: string): Promise<void> {
   await apiClient.delete(`/categories/${id}`);
 }
 
+// =======================
+// ESTOQUE / DEPÓSITOS
+// =======================
+
+export type StockLocation = {
+  id: string;
+  tenantId: string;
+  name: string;
+  isSaleSource: boolean;
+  createdAt: string;
+  updatedAt: string;
+  totalSkus?: number;
+  totalQuantity?: string | number;
+};
+
+export async function listStockLocations(): Promise<StockLocation[]> {
+  const response = await apiClient.get<{ items: StockLocation[] }>("/stock/locations");
+  return response.data.items ?? [];
+}
+
+export async function createStockLocation(payload: { name: string; isSaleSource?: boolean }): Promise<StockLocation> {
+  const response = await apiClient.post<StockLocation>("/stock/locations", {
+    name: payload.name,
+    isSaleSource: payload.isSaleSource ?? false,
+  });
+  return response.data;
+}
+
+export async function updateStockLocation(
+  id: string,
+  payload: { name: string; isSaleSource?: boolean },
+): Promise<StockLocation> {
+  const response = await apiClient.put<StockLocation>(`/stock/locations/${id}`, {
+    name: payload.name,
+    isSaleSource: payload.isSaleSource ?? false,
+  });
+  return response.data;
+}
+
+export async function deleteStockLocation(id: string): Promise<void> {
+  await apiClient.delete(`/stock/locations/${id}`);
+}
+
+export type Product = {
+  id: string;
+  tenantId: string;
+  name: string;
+  sku: string;
+  barcode?: string | null;
+  categoryId?: string | null;
+};
+
+export async function listProducts(): Promise<Product[]> {
+  const response = await apiClient.get<Product[]>("/products");
+  return response.data;
+}
+
+export type InventoryItem = {
+  id: string;
+  tenantId: string;
+  productId: string;
+  locationId: string;
+  quantity: string;
+};
+
+export async function listInventory(): Promise<InventoryItem[]> {
+  const response = await apiClient.get<{ items: InventoryItem[] } | InventoryItem[]>("/stock");
+  // API devolve { items } ou array direto, tratar ambos
+  const data = Array.isArray(response.data)
+    ? response.data
+    : Array.isArray((response.data as { items?: InventoryItem[] }).items)
+      ? (response.data as { items: InventoryItem[] }).items
+      : [];
+  return data;
+}
+
+export async function initInventoryBulk(items: Array<{ productId: string; locationId: string }>): Promise<void> {
+  await apiClient.post("/stock/init/bulk", { items });
+}
+
+export async function adjustStock(payload: {
+  productId: string;
+  locationId: string;
+  qty: number;
+  reason?: string;
+}): Promise<void> {
+  await apiClient.post("/stock/adjust", payload);
+}
+
+export async function stockTransfer(payload: {
+  productId: string;
+  fromLocationId: string;
+  toLocationId: string;
+  qty: number;
+  reason?: string;
+}): Promise<void> {
+  await apiClient.post("/stock/transfer", payload);
+}
+
+export async function deleteInventoryItem(productId: string, locationId: string): Promise<void> {
+  await apiClient.delete("/stock/inventory", {
+    params: { productId, locationId },
+  });
+}
+
+export type StockMovement = {
+  id: string;
+  tenantId: string;
+  productId: string;
+  locationId: string;
+  type: "IN" | "OUT" | "ADJUST" | "CANCEL" | "RETURN";
+  quantity: string | number;
+  reason?: string | null;
+  refId?: string | null;
+  createdBy?: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+};
+
+export async function listStockMovements(params?: { productId?: string; locationId?: string }): Promise<StockMovement[]> {
+  const response = await apiClient.get<{ items: StockMovement[] }>("/stock/movements", {
+    params: {
+      productId: params?.productId,
+      locationId: params?.locationId,
+    },
+  });
+  return response.data.items ?? [];
+}

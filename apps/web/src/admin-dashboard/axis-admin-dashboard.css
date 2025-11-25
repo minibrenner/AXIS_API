@@ -628,6 +628,221 @@ body,
   opacity: 0.7;
 }
 
+/* CLIENTES */
+.axis-clients {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.axis-clients-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.axis-clients-hero {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.axis-clients-hero-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: linear-gradient(
+    135deg,
+    rgba(56, 189, 248, 0.14),
+    rgba(15, 23, 42, 0.85)
+  );
+  color: #7dd3fc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.45);
+}
+.axis-root.axis-light .axis-clients-hero-icon {
+  background: linear-gradient(
+    135deg,
+    rgba(56, 189, 248, 0.14),
+    rgba(255, 255, 255, 0.95)
+  );
+  box-shadow: 0 10px 20px rgba(148, 163, 184, 0.35);
+}
+
+.axis-clients-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.axis-clients-subtitle {
+  font-size: 0.88rem;
+  opacity: 0.78;
+}
+
+.axis-clients-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.axis-chip-button {
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.65);
+  background: transparent;
+  color: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease,
+    transform 0.15s ease;
+}
+.axis-chip-button:hover {
+  transform: translateY(-1px);
+}
+.axis-chip-button.active {
+  background: linear-gradient(
+    135deg,
+    rgba(56, 189, 248, 0.2),
+    rgba(37, 99, 235, 0.3)
+  );
+  border-color: rgba(56, 189, 248, 0.9);
+  color: #7dd3fc;
+}
+.axis-root.axis-light .axis-chip-button.active {
+  color: #1d4ed8;
+}
+
+.axis-clients-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.axis-clients-card {
+  border-radius: 1rem;
+  padding: 0.85rem 1rem;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(51, 65, 85, 0.88);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.8);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.axis-clients-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.9);
+}
+.axis-clients-card.selected {
+  border-color: rgba(56, 189, 248, 0.95);
+  box-shadow: 0 18px 42px rgba(56, 189, 248, 0.2);
+}
+.axis-root.axis-light .axis-clients-card {
+  background: rgba(255, 255, 255, 0.97);
+  border-color: rgba(148, 163, 184, 0.7);
+  box-shadow: 0 12px 20px rgba(148, 163, 184, 0.4);
+}
+
+.axis-clients-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.axis-clients-card-icon {
+  color: rgba(226, 232, 240, 0.92);
+}
+.axis-root.axis-light .axis-clients-card-icon {
+  color: #0f172a;
+}
+
+.axis-clients-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.axis-clients-card-text {
+  font-size: 0.82rem;
+  opacity: 0.8;
+  line-height: 1.35;
+}
+
+.axis-clients-pill {
+  padding: 0.16rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.8);
+  font-size: 0.72rem;
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.15);
+}
+.axis-root.axis-light .axis-clients-pill {
+  color: #1d4ed8;
+  border-color: rgba(56, 189, 248, 0.85);
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.axis-clients-info {
+  border-radius: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px dashed rgba(148, 163, 184, 0.7);
+  background: rgba(15, 23, 42, 0.65);
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.axis-root.axis-light .axis-clients-info {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(148, 163, 184, 0.8);
+}
+
+.axis-clients-info-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.16);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #7dd3fc;
+}
+.axis-root.axis-light .axis-clients-info-icon {
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.axis-clients-info-title {
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.axis-clients-info-text {
+  font-size: 0.82rem;
+  opacity: 0.82;
+  margin-top: 0.1rem;
+}
+
+@media (max-width: 1024px) {
+  .axis-clients-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .axis-clients-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .axis-clients-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 @keyframes axis-topbar-video {
   0% {
     transform: translate3d(-12%, -8%, 0) scale(1.05);
@@ -713,6 +928,7 @@ body,
     border-color: #2563eb;
     color: #f9fafb;
     box-shadow: 0 4px 8px rgba(15, 23, 42, 0.4);
+    margin: 1vw;
   }
 
   .axis-admin-button-secondary,
@@ -1144,6 +1360,7 @@ body,
   font-size: 0.82rem;
   padding: 0.55rem 0.7rem;
   outline: none;
+  margin-top: 1vw;
 }
 
 .axis-input:focus,
@@ -1356,6 +1573,31 @@ body,
 
 .axis-toggle-pill.axis-toggle-pill--active .axis-toggle-pill-dot {
   transform: translateX(30px);
+}
+
+.axis-pagination-controls {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.axis-btn {
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.axis-btn:hover:not(:disabled) {
+  border-color: rgba(148, 163, 184, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.axis-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 

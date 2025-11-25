@@ -1,0 +1,194 @@
+.axis-transfer-root {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+}
+
+.axis-transfer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.axis-transfer-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.axis-transfer-title {
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+}
+
+.axis-transfer-subtitle {
+  font-size: 0.9rem;
+  opacity: 0.78;
+}
+
+.axis-transfer-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.axis-transfer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 1.4rem;
+  align-items: stretch;
+}
+
+.axis-transfer-panel {
+  border-radius: 1.1rem;
+  padding: 1.2rem 1.3rem 1.1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-height: 360px;
+}
+
+.axis-transfer-panel-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.axis-transfer-panel-title {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+}
+
+.axis-transfer-list {
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(51, 65, 85, 0.4);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.axis-transfer-list-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.4);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.axis-transfer-list-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.axis-transfer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.48rem 0.85rem;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.35);
+  font-size: 0.9rem;
+}
+
+.axis-transfer-row:last-child {
+  border-bottom: none;
+}
+
+.axis-transfer-product-name {
+  font-weight: 600;
+}
+
+.axis-transfer-product-meta {
+  font-size: 0.78rem;
+  opacity: 0.72;
+}
+
+.axis-transfer-qty-input {
+  width: 90px;
+  text-align: center;
+  padding: 0.46rem 0.5rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.axis-transfer-qty-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.7);
+}
+
+.axis-transfer-qty-pill {
+  min-width: 70px;
+  text-align: center;
+  padding: 0.38rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.axis-transfer-qty-pill--empty {
+  opacity: 0.5;
+}
+
+.axis-transfer-empty {
+  padding: 0.7rem 0.85rem;
+  font-size: 0.82rem;
+  opacity: 0.78;
+}
+
+.axis-transfer-middle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  opacity: 0.8;
+}
+
+.axis-transfer-middle span {
+  display: inline-flex;
+  align-items: center;
+  justifyContent: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.axis-transfer-footer {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+@media (max-width: 980px) {
+  .axis-transfer-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .axis-transfer-middle {
+    display: none;
+  }
+}
