@@ -41,7 +41,8 @@ type MainSection =
   | "stock"
   | "balances"
   | "transfer"
-  | "movements";
+  | "movements"
+  | "cashSale";
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -566,6 +567,85 @@ export function AxisAdminDashboardPage() {
               </ul>
             </div>
 
+            {/* CAIXA DE VENDA */}
+            <div
+              className={`axis-nav-group ${
+                isGroupOpen("caixa") ? "open" : ""
+              }`}
+              data-group="caixa"
+            >
+              <button
+                className="axis-nav-parent"
+                type="button"
+                onClick={() => toggleGroup("caixa")}
+              >
+                <div className="axis-nav-parent-main">
+                  <div className="axis-nav-icon">
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M5 4.5H19C20.38 4.5 21.5 5.62 21.5 7V15
+                           C21.5 16.38 20.38 17.5 19 17.5H5
+                           C3.62 17.5 2.5 16.38 2.5 15V7
+                           C2.5 5.62 3.62 4.5 5 4.5Z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                      />
+                      <rect
+                        x="10.5"
+                        y="17.5"
+                        width="3"
+                        height="3"
+                        rx="0.6"
+                        fill="currentColor"
+                      />
+                      <rect
+                        x="9"
+                        y="7"
+                        width="6"
+                        height="3.2"
+                        rx="0.9"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                      />
+                      <line
+                        x1="9"
+                        y1="11.6"
+                        x2="15"
+                        y2="11.6"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </div>
+                  <span className="axis-nav-parent-label">Caixa de venda</span>
+                </div>
+                <span className="axis-nav-parent-chevron">�?�</span>
+              </button>
+              <ul className="axis-nav-children">
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("cashSale");
+                    setOpenGroups((prev) =>
+                      prev.includes("caixa") ? prev : [...prev, "caixa"],
+                    );
+                  }}
+                >
+                  <span>Iniciar venda</span>
+                  <small>Abrir fluxo do caixa</small>
+                </li>
+              </ul>
+            </div>
+
             <div
               className={`axis-nav-group ${
                 isGroupOpen("vendas") ? "open" : ""
@@ -617,6 +697,28 @@ export function AxisAdminDashboardPage() {
             <AxisStockTransferPageContent />
           ) : mainSection === "movements" ? (
             <AxisStockMovementsPageContent />
+          ) : mainSection === "cashSale" ? (
+            <section className="axis-panels-grid">
+              <article className="axis-panel">
+                <div className="axis-panel-header">
+                  <div>
+                    <div className="axis-panel-title">Caixa de venda</div>
+                    <div className="axis-panel-subtitle">
+                      Inicie um atendimento e registre produtos e pagamentos.
+                    </div>
+                  </div>
+                  <button type="button" className="axis-admin-button-primary">
+                    Iniciar venda
+                  </button>
+                </div>
+                <div
+                  className="axis-dashboard-subtitle"
+                  style={{ padding: "1rem 0 0.5rem" }}
+                >
+                  Em breve conectaremos este atalho ao fluxo completo do PDV.
+                </div>
+              </article>
+            </section>
           ) : (
             <>
               <header className="axis-dashboard-header">
