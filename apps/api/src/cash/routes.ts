@@ -131,12 +131,34 @@ cashRouter.post("/open", ROLE_GUARD, async (req, res) => {
     if (normalizedRegister) {
       const registerInUse = await prisma.cashSession.findFirst({
         where: { tenantId, registerNumber: normalizedRegister, closedAt: null },
+        select: { id: true, userId: true, registerNumber: true },
       });
+
       if (registerInUse) {
+        let openedByName: string | undefined;
+        if (registerInUse.userId) {
+          const openedByUser = await prisma.user.findFirst({
+            where: { id: registerInUse.userId, tenantId },
+            select: { id: true, name: true, email: true },
+          });
+          openedByName =
+            openedByUser?.name ??
+            openedByUser?.email ??
+            openedByUser?.id ??
+            undefined;
+        }
+
         throw new HttpError({
           status: 409,
           code: ErrorCodes.CONFLICT,
           message: "Ja existe um caixa aberto com essa numeracao para este tenant.",
+          details: {
+            registerNumber: normalizedRegister,
+            openedBy: {
+              id: registerInUse.userId,
+              name: openedByName ?? "Usuario",
+            },
+          },
         });
       }
     }
@@ -445,4 +467,3 @@ async function buildClosingSnapshot(input: {
     },
   };
 }
-

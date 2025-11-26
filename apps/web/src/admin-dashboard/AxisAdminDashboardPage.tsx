@@ -41,8 +41,7 @@ type MainSection =
   | "stock"
   | "balances"
   | "transfer"
-  | "movements"
-  | "cashSale";
+  | "movements";
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -634,10 +633,7 @@ export function AxisAdminDashboardPage() {
                 <li
                   className="axis-nav-child"
                   onClick={() => {
-                    setMainSection("cashSale");
-                    setOpenGroups((prev) =>
-                      prev.includes("caixa") ? prev : [...prev, "caixa"],
-                    );
+                    navigate("/admin/caixa");
                   }}
                 >
                   <span>Iniciar venda</span>
@@ -697,28 +693,6 @@ export function AxisAdminDashboardPage() {
             <AxisStockTransferPageContent />
           ) : mainSection === "movements" ? (
             <AxisStockMovementsPageContent />
-          ) : mainSection === "cashSale" ? (
-            <section className="axis-panels-grid">
-              <article className="axis-panel">
-                <div className="axis-panel-header">
-                  <div>
-                    <div className="axis-panel-title">Caixa de venda</div>
-                    <div className="axis-panel-subtitle">
-                      Inicie um atendimento e registre produtos e pagamentos.
-                    </div>
-                  </div>
-                  <button type="button" className="axis-admin-button-primary">
-                    Iniciar venda
-                  </button>
-                </div>
-                <div
-                  className="axis-dashboard-subtitle"
-                  style={{ padding: "1rem 0 0.5rem" }}
-                >
-                  Em breve conectaremos este atalho ao fluxo completo do PDV.
-                </div>
-              </article>
-            </section>
           ) : (
             <>
               <header className="axis-dashboard-header">

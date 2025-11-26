@@ -2,6 +2,7 @@ import { API_URL } from "./config";
 import { apiClient } from "./http";
 
 export type SuperAdminTokens = { token: string; tokenType: string; expiresIn: string };
+type ApiError = { response?: { status?: number; data?: { message?: string; details?: unknown } } };
 
 export async function login(email: string, password: string) {
   try {
@@ -287,6 +288,235 @@ export async function fetchCashClosingReport(access: string, cashSessionId: stri
   }
 
   return res.json();
+}
+
+export async function openCashSession(payload: {
+  registerNumber?: string;
+  openingCents: number;
+  notes?: string;
+}): Promise<void> {
+  try {
+    await apiClient.post("/cash/open", {
+      registerNumber: payload.registerNumber,
+      openingCents: payload.openingCents,
+      notes: payload.notes,
+    });
+  } catch (error: unknown) {
+    const maybeAxios = error as ApiError;
+    const status = maybeAxios?.response?.status;
+    const data = maybeAxios?.response?.data as
+      | { message?: string; details?: { maxOpen?: number; registerNumber?: string; openedBy?: { id?: string | null; name?: string | null } } }
+      | undefined;
+    let message =
+      typeof data?.message === "string"
+        ? data.message
+        : "Falha ao abrir o caixa.";
+    const details = maybeAxios?.response?.data?.details as
+      | { registerNumber?: string; openedBy?: { id?: string | null; name?: string | null } }
+      | undefined;
+
+    if (status === 409) {
+      if (details?.openedBy?.name || details?.openedBy?.id) {
+        const name = details.openedBy.name ?? details.openedBy.id ?? "outro operador";
+        throw new Error(
+          `Esse caixa já está aberto por ${name}. Feche ou escolha outro número.`,
+        );
+      }
+      if (data?.details?.maxOpen) {
+        throw new Error(
+          `Limite de caixas abertos atingido (máx. ${data.details.maxOpen}). Feche um caixa antes de abrir outro.`,
+        );
+      }
+    }
+
+    if (!status) {
+      message = "Não foi possível conectar ao servidor. Verifique sua rede.";
+    }
+
+    throw new Error(message);
+  }
+}
+
+// ===============
+// VENDAS / POS
+// ===============
+
+export type DiscountInput =
+  | { type: "value"; valueCents: number }
+  | { type: "percent"; percent: number };
+
+export type PaymentMethod = "cash" | "debit" | "credit" | "pix" | "vr" | "va" | "store_credit";
+
+export type SaleItemInput = {
+  productId: string;
+  sku?: string;
+  name: string;
+  qty: number;
+  unitPriceCents: number;
+  discount?: DiscountInput;
+};
+
+export type PaymentInput = {
+  method: PaymentMethod;
+  amountCents: number;
+  providerId?: string;
+};
+
+export type SaleInput = {
+  cashSessionId: string;
+  locationId: string;
+  items: SaleItemInput[];
+  payments: PaymentInput[];
+  discount?: DiscountInput;
+  fiscalMode?: "sat" | "nfce" | "none";
+  saleId?: string;
+};
+
+export type SalePayment = {
+  id: string;
+  method: PaymentMethod;
+  amountCents: number;
+  providerId: string | null;
+};
+
+export type SaleItem = {
+  id: string;
+  productId: string;
+  sku: string | null;
+  name: string;
+  qty: string;
+  unitPriceCents: number;
+  totalCents: number;
+  discountCents: number;
+  discountMode: "NONE" | "VALUE" | "PERCENT";
+};
+
+export type Sale = {
+  id: string;
+  tenantId: string;
+  userId: string;
+  cashSessionId: string;
+  number: number;
+  status: string;
+  subtotalCents: number;
+  discountCents: number;
+  discountMode: "NONE" | "VALUE" | "PERCENT";
+  totalCents: number;
+  changeCents: number;
+  fiscalMode: "sat" | "nfce" | "none";
+  fiscalKey?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  items: SaleItem[];
+  payments: SalePayment[];
+};
+
+export type StockWarning = { productId: string; locationId: string; balance: string };
+export type StockError = { productId: string; locationId?: string; message: string };
+
+export type CreateSaleResult = {
+  sale: Sale;
+  fiscalStatus?: string;
+  fiscalError?: string;
+  stockWarnings?: StockWarning[];
+  stockErrors?: StockError[];
+};
+
+export type CreateSaleResponse = CreateSaleResult | { duplicate: true };
+
+export async function createSale(payload: {
+  sale: SaleInput;
+  supervisorSecret?: string;
+  idempotencyKey?: string;
+}): Promise<CreateSaleResponse> {
+  try {
+    const res = await apiClient.post<CreateSaleResponse>(
+      "/sales",
+      {
+        sale: payload.sale,
+        supervisorSecret: payload.supervisorSecret,
+        idempotencyKey: payload.idempotencyKey,
+      },
+      {
+        headers: {
+          ...(payload.supervisorSecret ? { "x-supervisor-secret": payload.supervisorSecret } : {}),
+          ...(payload.idempotencyKey ? { "x-idempotency-key": payload.idempotencyKey } : {}),
+        },
+      },
+    );
+    return res.data;
+  } catch (error: unknown) {
+    const maybeAxios = error as ApiError;
+    const message =
+      typeof maybeAxios?.response?.data?.message === "string"
+        ? maybeAxios.response.data.message
+        : "Falha ao criar venda.";
+    throw new Error(message);
+  }
+}
+
+export async function cancelSale(
+  saleId: string,
+  payload: { reason: string; supervisorSecret?: string },
+): Promise<Sale> {
+  try {
+    const res = await apiClient.post<Sale>(
+      `/sales/${saleId}/cancel`,
+      { reason: payload.reason, supervisorSecret: payload.supervisorSecret },
+      {
+        headers: payload.supervisorSecret ? { "x-supervisor-secret": payload.supervisorSecret } : {},
+      },
+    );
+    return res.data;
+  } catch (error: unknown) {
+    const maybeAxios = error as ApiError;
+    const message =
+      typeof maybeAxios?.response?.data?.message === "string"
+        ? maybeAxios.response.data.message
+        : "Falha ao cancelar a venda.";
+    throw new Error(message);
+  }
+}
+
+export type SaleReceipt = {
+  saleId: string;
+  tenant: { name: string; cnpj?: string | null };
+  items: Array<{
+    id: string;
+    name: string;
+    qty: number;
+    unitPriceCents: number;
+    totalCents: number;
+    discountCents: number;
+  }>;
+  payments: Array<{
+    id: string;
+    method: string;
+    amountCents: number;
+    providerId?: string | null;
+  }>;
+  subtotalCents: number;
+  discountCents: number;
+  totalCents: number;
+  changeCents: number;
+  fiscalKey?: string | null;
+  createdAt: string;
+  receiptText: string;
+  escposBase64: string;
+};
+
+export async function fetchSaleReceipt(saleId: string): Promise<SaleReceipt> {
+  try {
+    const res = await apiClient.get<SaleReceipt>(`/sales/${saleId}/receipt`);
+    return res.data;
+  } catch (error: unknown) {
+    const maybeAxios = error as ApiError;
+    const message =
+      typeof maybeAxios?.response?.data?.message === "string"
+        ? maybeAxios.response.data.message
+        : "Falha ao buscar recibo da venda.";
+    throw new Error(message);
+  }
 }
 
 // =======================

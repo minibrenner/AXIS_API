@@ -3,6 +3,7 @@ import CashClosingReportPage from "./cash/CashClosingReportPage";
 import AxisAdminDashboardPage from "./admin-dashboard/AxisAdminDashboardPage";
 import { AxisLoginPage, ResetPasswordPage, SuperAdminLoginPage } from "./login";
 import SuperAdminDashboardPage from "./super-admin/SuperAdminDashboardPage";
+import AxisPosPage from "./admin-dashboard/AxisPosPage";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           element={<SuperAdminDashboardPage />}
         />
         <Route path="/admin/dashboard" element={<AxisAdminDashboardPage />} />
+        <Route path="/admin/caixa" element={<AxisPosPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
