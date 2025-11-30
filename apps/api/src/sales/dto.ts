@@ -13,7 +13,7 @@ export const discountInputSchema = z.discriminatedUnion("type", [
 ]);
 
 export const saleItemSchema = z.object({
-  productId: z.string().uuid(),
+  productId: z.string().cuid(),
   sku: z.string().optional(),
   name: z.string().min(1),
   qty: z.coerce.number().positive(),

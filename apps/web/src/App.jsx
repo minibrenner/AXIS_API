@@ -3,7 +3,7 @@ import CashClosingReportPage from "./cash/CashClosingReportPage";
 import AxisAdminDashboardPage from "./admin-dashboard/AxisAdminDashboardPage";
 import { AxisLoginPage, ResetPasswordPage, SuperAdminLoginPage } from "./login";
 import SuperAdminDashboardPage from "./super-admin/SuperAdminDashboardPage";
-import AxisPosPage from "./admin-dashboard/AxisPosPage";
+import AxisPosPage from "./Venda/AxisPosPage";
 
 function App() {
   return (

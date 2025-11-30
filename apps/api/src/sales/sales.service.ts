@@ -1,4 +1,4 @@
-import { DiscountMode, FiscalStatus, Prisma, Role } from "@prisma/client";
+import { DiscountMode, FiscalStatus, Prisma, Role, PrintJobStatus } from "@prisma/client";
 import { BadRequest } from "../utils/httpErrors";
 import { prisma } from "../prisma/client";
 import { DiscountInput, SaleInput, SaleItemInput, saleSchema } from "./dto";
@@ -7,6 +7,8 @@ import { cancelSale as stockCancel, selectInventoryForSale, stockOut } from "../
 import { getFiscalAdapter } from "../fiscal/adapter";
 import { trackFiscalAttempt } from "../fiscal/service";
 import { requireSupervisorApproval } from "../security/supervisorAuth";
+import { buildReceipt } from "./receipt";
+import { enqueueSaleReceiptPrintJob } from "../printing/service";
 
 type SaleWithRelations = Prisma.SaleGetPayload<{ include: { items: true; payments: true } }>;
 
@@ -40,6 +42,8 @@ type CreateSaleResult = {
   fiscalError?: string;
   stockWarnings?: StockWarning[];
   stockErrors?: StockError[];
+  printJobId?: string;
+  printJobStatus?: PrintJobStatus;
 };
 
 export type CreateSaleResponse = CreateSaleResult | { duplicate: true };
@@ -199,6 +203,19 @@ export async function createSale(options: CreateSaleOptions): Promise<CreateSale
   }
 
   const paid = payments.reduce((acc, p) => acc + p.amountCents, 0);
+  if (paid < total) {
+    throw new BadRequest("Valor pago \u00e9 menor que o total da venda.");
+  }
+
+  let remaining = total;
+  for (const payment of payments) {
+    const effectiveRemaining = Math.max(remaining, 0);
+    if (payment.method !== "cash" && payment.amountCents > effectiveRemaining) {
+      throw new BadRequest("Pagamentos n\u00e3o podem exceder o valor restante (apenas dinheiro pode gerar troco).");
+    }
+    remaining -= payment.amountCents;
+  }
+
   const change = Math.max(paid - total, 0);
 
   const attendantNeedsApproval =
@@ -226,6 +243,10 @@ export async function createSale(options: CreateSaleOptions): Promise<CreateSale
 
     if (!cash) {
       throw new BadRequest("Sess\u00e3o de caixa inv\u00e1lida ou j\u00e1 encerrada.");
+    }
+
+    if (cash.userId !== options.userId) {
+      throw new BadRequest("Caixa pertence a outro operador. Use o seu caixa aberto.");
     }
 
     const number = await nextSaleNumber(options.tenantId, tx);
@@ -329,6 +350,22 @@ export async function createSale(options: CreateSaleOptions): Promise<CreateSale
     ...(stockWarnings ? { stockWarnings } : {}),
     ...(stockErrors ? { stockErrors } : {}),
   };
+
+  try {
+    const receipt = await buildReceipt(options.tenantId, txResult.sale.id);
+    const printJob = await enqueueSaleReceiptPrintJob({
+      tenantId: options.tenantId,
+      userId: options.userId,
+      saleId: txResult.sale.id,
+      receipt,
+      source: "pos-web",
+    });
+    result.printJobId = printJob.id;
+    result.printJobStatus = printJob.status;
+  } catch (err) {
+    // Impressão não deve quebrar a venda; logar e seguir
+    console.error("Falha ao enfileirar recibo de venda:", err);
+  }
 
   if (options.idempotencyKey && "sale" in txResult) {
     await prisma.auditLog.create({

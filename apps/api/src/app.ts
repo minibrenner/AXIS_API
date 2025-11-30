@@ -42,10 +42,18 @@ export function buildApp() {
             return callback(null, true);
           }
           return callback(null, false);
-        },
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-request-id", "x-correlation-id", "x-tenant-id"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-request-id",
+      "x-correlation-id",
+      "x-tenant-id",
+      "x-idempotency-key",
+      "x-supervisor-secret",
+    ],
     optionsSuccessStatus: 204,
   };
 

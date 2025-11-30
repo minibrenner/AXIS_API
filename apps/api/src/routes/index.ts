@@ -16,6 +16,7 @@ import { syncRouter } from "../sync/routes";
 import { customersRouter } from "../customers/customers.routes";
 import { ledgerRouter } from "../customers/ledger.routes";
 import { statementPdfRouter } from "../customers/statement.pdf.routes";
+import { printingRouter } from "../printing/routes";
 
 /**
  * Router raiz da API. Centraliza o registro de todos os sub-routers.
@@ -52,6 +53,7 @@ const secureRoutes: Array<[string, Router]> = [
   ["/customers", customersRouter],
   ["/customers", ledgerRouter],
   ["/customers", statementPdfRouter],
+  ["/printing", printingRouter],
 ];
 
 for (const [prefix, childRouter] of secureRoutes) {

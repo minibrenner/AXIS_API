@@ -90,7 +90,7 @@ const withdrawalSchema = z.object({
 const closeSchema = z.object({
   cashSessionId: z.string().cuid(),
   closingCents: z.coerce.number().int().nonnegative(),
-  supervisorSecret: z.string().trim().min(4),
+  supervisorSecret: z.string().trim().min(4).optional(),
   notes: z.string().trim().max(280).optional(),
 });
 
@@ -109,6 +109,24 @@ cashRouter.post("/open", ROLE_GUARD, async (req, res) => {
         status: 404,
         code: ErrorCodes.TENANT_NOT_FOUND,
         message: "Tenant nao encontrado.",
+      });
+    }
+
+    const existingUserSession = await prisma.cashSession.findFirst({
+      where: { tenantId, userId: req.user!.userId, closedAt: null },
+      select: { id: true, registerNumber: true, openedAt: true },
+    });
+
+    if (existingUserSession) {
+      throw new HttpError({
+        status: 409,
+        code: ErrorCodes.CONFLICT,
+        message: "Voce ja possui um caixa aberto. Finalize o caixa atual antes de abrir outro.",
+        details: {
+          openSessionId: existingUserSession.id,
+          registerNumber: existingUserSession.registerNumber,
+          openedAt: existingUserSession.openedAt,
+        },
       });
     }
 
@@ -184,17 +202,18 @@ cashRouter.post("/open", ROLE_GUARD, async (req, res) => {
   });
 });
 
-const readCurrentSession = async (tenantId: string) =>
+const readCurrentSession = async (tenantId: string, userId: string) =>
   TenantContext.run(tenantId, () =>
     prisma.cashSession.findFirst({
-      where: { tenantId, closedAt: null },
+      where: { tenantId, userId, closedAt: null },
       include: { withdrawals: { orderBy: { createdAt: "asc" } } },
+      orderBy: { openedAt: "desc" },
     }),
   );
 
 const currentSessionHandler = async (req: Request, res: Response) => {
   const tenantId = req.tenantId!;
-  const session = await readCurrentSession(tenantId);
+  const session = await readCurrentSession(tenantId, req.user!.userId);
   res.json(session);
 };
 
@@ -240,6 +259,8 @@ cashRouter.post("/withdraw", ROLE_GUARD, async (req, res) => {
 cashRouter.post("/close", ROLE_GUARD, async (req, res) => {
   const { cashSessionId, closingCents, supervisorSecret, notes } = closeSchema.parse(req.body);
   const tenantId = req.tenantId!;
+  const requiresSupervisor = req.user!.role === "ATTENDANT";
+  const resolvedSecret = supervisorSecret ?? req.header("x-supervisor-secret") ?? undefined;
 
   const enrichedSnapshot = await TenantContext.run(tenantId, async () => {
     const session = await prisma.cashSession.findFirst({
@@ -255,7 +276,9 @@ cashRouter.post("/close", ROLE_GUARD, async (req, res) => {
       });
     }
 
-    const approval = await requireSupervisorApproval(tenantId, supervisorSecret, "Fechamento de caixa");
+    const approval = requiresSupervisor
+      ? await requireSupervisorApproval(tenantId, resolvedSecret, "Fechamento de caixa")
+      : null;
     const closedAt = new Date();
     const closingNotes = notes?.length ? notes : null;
 
@@ -266,7 +289,7 @@ cashRouter.post("/close", ROLE_GUARD, async (req, res) => {
       closingCents,
       closedByUserId: req.user!.userId,
       closingNotes,
-      supervisor: approval,
+      supervisor: approval ?? undefined,
     });
 
     const printJob = await enqueueCashClosingPrintJob({
@@ -288,9 +311,9 @@ cashRouter.post("/close", ROLE_GUARD, async (req, res) => {
         closingCents,
         closedAt,
         closedByUserId: req.user!.userId,
-        closingSupervisorId: approval.approverId,
-        closingSupervisorRole: approval.approverRole,
-        closingApprovalVia: approval.via,
+        closingSupervisorId: approval?.approverId ?? null,
+        closingSupervisorRole: approval?.approverRole ?? null,
+        closingApprovalVia: approval?.via ?? null,
         closingSnapshot: enriched as Prisma.JsonObject,
         closingNotes,
       },

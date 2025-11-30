@@ -463,6 +463,14 @@
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
 }
 
+.axis-pos-root.sidebar-collapsed {
+  grid-template-columns: 72px minmax(0, 1.9fr) minmax(0, 1.2fr);
+}
+
+.axis-pos-root.sidebar-collapsed {
+  grid-template-columns: 72px minmax(0, 1.9fr) minmax(0, 1.2fr);
+}
+
 .axis-pos-sidebar {
   grid-area: sidebar;
   background: linear-gradient(180deg, #0ea5e9, #0369a1);
@@ -473,12 +481,42 @@
   gap: 0.75rem;
 }
 
+.axis-pos-sidebar.collapsed {
+  padding: 1rem 0.35rem;
+}
+
+.axis-pos-sidebar.collapsed {
+  padding: 1rem 0.35rem;
+}
+
 .axis-pos-sidebar-logo {
   padding: 0.25rem 0.65rem 0.8rem;
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.axis-pos-sidebar-toggle {
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: #f9fafb;
+  border-radius: 8px;
+  padding: 0.12rem 0.45rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.axis-pos-sidebar-toggle {
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: #f9fafb;
+  border-radius: 8px;
+  padding: 0.12rem 0.45rem;
+  cursor: pointer;
+  font-size: 0.9rem;
 }
 
 .axis-pos-sidebar-group {
@@ -503,7 +541,7 @@
   transition: background 0.15s ease, transform 0.05s ease;
 }
 
-.axis-pos-sidebar-button--primary {
+.axis-pos-sidebar-button--active {
   background: #f97316;
   color: #111827;
   font-weight: 600;
@@ -523,6 +561,13 @@
   align-items: center;
   justify-content: center;
   font-size: 0.9rem;
+}
+
+.axis-pos-sidebar.collapsed .axis-pos-sidebar-button span:last-child {
+  display: none;
+}
+.axis-pos-sidebar.collapsed .axis-pos-sidebar-button span:last-child {
+  display: none;
 }
 
 .axis-pos-sidebar-footer {
@@ -546,6 +591,28 @@
   display: flex;
   gap: 1.5rem;
   align-items: center;
+}
+
+.axis-pos-session-banner {
+  grid-column: 1 / -1;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  margin: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.axis-pos-session-banner__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.25);
 }
 
 .axis-pos-topbar-item-label {
@@ -614,7 +681,10 @@
   padding: 0.45rem 0.7rem;
   font-size: 0.9rem;
   align-items: center;
+  justify-items: center;
   border-top: 1px solid #f3f4f6;
+  cursor: pointer;
+  column-gap: 8px;
 }
 
 .axis-pos-cart-row:nth-child(odd) {
@@ -623,6 +693,12 @@
 
 .axis-pos-cart-row:first-child {
   border-top: none;
+}
+
+.axis-pos-cart-row.active {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  transform: translateY(-1px);
 }
 
 .axis-pos-cart-product-name {
@@ -637,24 +713,30 @@
 .axis-pos-cart-qty-control {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
+  justify-content: center;
+  border-radius: 12px;
   border: 1px solid #d1d5db;
   overflow: hidden;
   background: #f9fafb;
+  gap: 2px;
+  padding: 0 4px;
 }
 
 .axis-pos-cart-qty-btn {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border: none;
   background: transparent;
   font-size: 0.9rem;
   cursor: pointer;
   color: #374151;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .axis-pos-cart-qty-input {
-  width: 40px;
+  width: 38px;
   border: none;
   text-align: center;
   font-size: 0.85rem;
@@ -665,7 +747,8 @@
 
 .axis-pos-cart-price {
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 700;
+  font-size: 0.95rem;
 }
 
 .axis-pos-cart-remove {
@@ -733,6 +816,11 @@
   color: #1f2937;
 }
 
+.axis-pos-center-btn--primary {
+  background: #3b82f6;
+  color: #f9fafb;
+}
+
 .axis-pos-center-btn--success {
   background: #22c55e;
 }
@@ -754,6 +842,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  min-height: 110px;
 }
 
 .axis-pos-client-name {
@@ -790,6 +879,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  position: relative;
 }
 
 .axis-pos-product-preview {
@@ -827,8 +917,8 @@
 
 .axis-pos-qty-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 0.4rem;
 }
 
@@ -842,11 +932,10 @@
 }
 
 .axis-pos-qty-btn {
-  width: 26px;
-  height: 26px;
+
   border: none;
   background: transparent;
-  font-size: 0.9rem;
+  
   cursor: pointer;
   color: #374151;
 }
@@ -919,6 +1008,194 @@
   background: #3b82f6;
   color: #f9fafb;
   margin-top: 0.2rem;
+}
+
+.axis-pos-input-outline {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #0f172a !important;
+}
+
+.axis-pos-input-outline::placeholder {
+  color: #111827;
+}
+
+.axis-pos-input-outline:focus {
+  outline: 2px solid #0f172a;
+}
+
+.axis-pos-search-results {
+  position: absolute;
+  top: calc(70% + 2px);
+  left: 0;
+  width: 100%;
+  margin-top: 0;
+  background: #ffffff;
+  border: 1px solid #0f172a;
+  border-radius: 0.6rem;
+  list-style: none;
+  padding: 0.25rem;
+  display: grid;
+  gap: 0.25rem;
+  max-height: 220px;
+  overflow: auto;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.18);
+  z-index: 8;
+}
+
+.axis-pos-search-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  min-height: 56px;
+}
+
+.axis-pos-search-result:hover {
+  background: #f3f4f6;
+}
+
+.axis-pos-search-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.axis-pos-search-meta {
+  font-size: 0.82rem;
+  color: #4b5563;
+}
+
+.axis-pos-search-price {
+  font-weight: 700;
+  color: #111827;
+}
+
+.axis-pos-price-value--action {
+  cursor: pointer;
+  color: #38bdf8;
+}
+
+.axis-pos-empty-row {
+  padding: 1rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.axis-pos-mini-btn {
+  margin-top: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: 0.4rem;
+  border: 1px solid #111827;
+  background: #fff;
+  cursor: pointer;
+  color: #111827;
+}
+
+.axis-pos-mini-btn--clear {
+  border-color: #ef4444;
+  color: #b91c1c;
+}
+
+.axis-pos-keypad-btn {
+  color: #0f172a;
+}
+
+.axis-modal.axis-modal-sm {
+  max-width: 420px;
+}
+
+.axis-pos-price-modal .axis-modal {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.axis-pos-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
+.axis-pos-payment-btn {
+  border: 1px solid #d1d5db;
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.8rem;
+  background: #ffffff;
+  cursor: pointer;
+  font-weight: 600;
+  color: #0f172a;
+  transition: all 0.12s ease;
+}
+
+.axis-pos-payment-btn:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+}
+
+.axis-pos-payment-btn--active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  color: #0f172a;
+}
+
+.axis-pos-payment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.6rem;
+  padding: 0.6rem;
+  background: #fff;
+}
+
+.axis-pos-payment-list-title {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.axis-pos-payment-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.axis-button-primary--nav {
+  background: #3b82f6;
+  color: #ffffff;
+  border: 1px solid #2563eb;
+}
+
+.axis-pos-price-modal .axis-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1vw;
+}
+.axis-pos-price-modal .axis-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.axis-pos-price-modal .axis-modal-title,
+.axis-pos-price-modal .axis-modal-subtitle,
+.axis-pos-price-modal .axis-label {
+  color: #0f172a;
+}
+
+.axis-pos-price-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.axis-pos-price-divider {
+  color: #4b5563;
 }
 
 @media (max-width: 1180px) {

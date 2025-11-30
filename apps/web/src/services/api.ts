@@ -246,6 +246,18 @@ const parseJson = async (res: Response) => {
   }
 };
 
+export type CashSession = {
+  id: string;
+  tenantId: string;
+  userId: string;
+  openingCents: number;
+  closingCents: number | null;
+  openedAt: string;
+  closedAt: string | null;
+  registerNumber: string | null;
+  notes: string | null;
+};
+
 export type CashClosingReport = {
   sessionId: string;
   tenantId: string;
@@ -290,32 +302,50 @@ export async function fetchCashClosingReport(access: string, cashSessionId: stri
   return res.json();
 }
 
+export async function fetchOpenCashSession(): Promise<CashSession | null> {
+  try {
+    const res = await apiClient.get<CashSession | null>("/cash/session");
+    return res.data ?? null;
+  } catch (error: unknown) {
+    const maybeAxios = error as ApiError;
+    const message =
+      typeof maybeAxios?.response?.data?.message === "string"
+        ? maybeAxios.response.data.message
+        : "Falha ao buscar sessao de caixa.";
+    throw new Error(message);
+  }
+}
+
 export async function openCashSession(payload: {
   registerNumber?: string;
   openingCents: number;
   notes?: string;
-}): Promise<void> {
+}): Promise<CashSession> {
   try {
-    await apiClient.post("/cash/open", {
+    const res = await apiClient.post<{ session: CashSession }>("/cash/open", {
       registerNumber: payload.registerNumber,
       openingCents: payload.openingCents,
       notes: payload.notes,
     });
+    return res.data.session;
   } catch (error: unknown) {
     const maybeAxios = error as ApiError;
     const status = maybeAxios?.response?.status;
     const data = maybeAxios?.response?.data as
-      | { message?: string; details?: { maxOpen?: number; registerNumber?: string; openedBy?: { id?: string | null; name?: string | null } } }
+      | { message?: string; details?: { maxOpen?: number; registerNumber?: string; openedBy?: { id?: string | null; name?: string | null }; openSessionId?: string } }
       | undefined;
     let message =
       typeof data?.message === "string"
         ? data.message
         : "Falha ao abrir o caixa.";
     const details = maybeAxios?.response?.data?.details as
-      | { registerNumber?: string; openedBy?: { id?: string | null; name?: string | null } }
+      | { registerNumber?: string; openedBy?: { id?: string | null; name?: string | null }; openSessionId?: string }
       | undefined;
 
     if (status === 409) {
+      if (details?.openSessionId) {
+        throw new Error("Voce ja possui um caixa aberto. Continue no mesmo caixa antes de abrir outro.");
+      }
       if (details?.openedBy?.name || details?.openedBy?.id) {
         const name = details.openedBy.name ?? details.openedBy.id ?? "outro operador";
         throw new Error(
@@ -333,6 +363,29 @@ export async function openCashSession(payload: {
       message = "Não foi possível conectar ao servidor. Verifique sua rede.";
     }
 
+    throw new Error(message);
+  }
+}
+
+export async function closeCashSession(payload: {
+  cashSessionId: string;
+  closingCents: number;
+  supervisorSecret?: string;
+  notes?: string;
+}): Promise<void> {
+  try {
+    await apiClient.post("/cash/close", {
+      cashSessionId: payload.cashSessionId,
+      closingCents: payload.closingCents,
+      ...(payload.supervisorSecret ? { supervisorSecret: payload.supervisorSecret } : {}),
+      notes: payload.notes,
+    });
+  } catch (error: unknown) {
+    const maybeAxios = error as ApiError;
+    const message =
+      typeof maybeAxios?.response?.data?.message === "string"
+        ? maybeAxios.response.data.message
+        : "Falha ao fechar o caixa.";
     throw new Error(message);
   }
 }
@@ -480,9 +533,14 @@ export async function cancelSale(
 
 export type SaleReceipt = {
   saleId: string;
-  tenant: { name: string; cnpj?: string | null };
+  number?: number | null;
+  tenant: { name: string; cnpj?: string | null; address?: string | null };
+  operatorName?: string | null;
+  registerNumber?: string | null;
   items: Array<{
     id: string;
+    productId: string;
+    sku: string | null;
     name: string;
     qty: number;
     unitPriceCents: number;
@@ -498,6 +556,7 @@ export type SaleReceipt = {
   subtotalCents: number;
   discountCents: number;
   totalCents: number;
+  paidCents: number;
   changeCents: number;
   fiscalKey?: string | null;
   createdAt: string;
@@ -517,6 +576,17 @@ export async function fetchSaleReceipt(saleId: string): Promise<SaleReceipt> {
         : "Falha ao buscar recibo da venda.";
     throw new Error(message);
   }
+}
+
+
+// =======================
+// SESS?O / KEEP ALIVE POS
+// =======================
+
+export async function ensureSessionAlive(): Promise<void> {
+  // Usa /auth/me: se o access estiver expirado, o interceptor tenta refresh.
+  // Se falhar, propagamos o erro para o chamador decidir.
+  await apiClient.get("/auth/me");
 }
 
 // =======================
@@ -623,6 +693,7 @@ export type Product = {
   tenantId: string;
   name: string;
   sku: string;
+  price?: string | null;
   barcode?: string | null;
   categoryId?: string | null;
 };
