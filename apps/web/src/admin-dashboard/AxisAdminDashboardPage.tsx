@@ -10,12 +10,19 @@ import {
 import AxisCategoriesPageContent from "./categories/AxisCategoriesPageContent";
 import AxisClientsPageContent from "./clients/AxisClientsPageContent";
 import ClientsLogoIcon from "./clients/ClientsLogoIcon";
+import ComandasLogoIcon from "./comandas/ComandasLogoIcon";
 import AxisProductsPageContent from "./products/AxisProductsPageContent";
 import AxisUsersPageContent from "./users/AxisUsersPageContent";
 import AxisStockDepositsPageContent from "./estoque/AxisStockDepositsPageContent";
 import AxisStockBalancesPageContent from "./estoque/AxisStockBalancesPageContent";
 import AxisStockTransferPageContent from "./estoque/AxisStockTransferPageContent";
 import AxisStockMovementsPageContent from "./estoque/AxisStockMovementsPageContent";
+import PrintersLogoIcon from "./printing/PrintersLogoIcon";
+import PrintingConfigPage from "./printing/PrintingConfigPage";
+import { ComandasStartPage } from "./comandas/ComandasStartPage";
+import { ComandasOrderPage } from "./comandas/ComandasOrderPage";
+import { ComandasListPage } from "./comandas/ComandasListPage";
+import { ComandasClosePage } from "./comandas/ComandasClosePage";
 
 type Theme = "dark" | "light";
 type NavGroupId =
@@ -23,14 +30,15 @@ type NavGroupId =
   | "categorias"
   | "produtos"
   | "usuarios"
+  | "comandas"
   | "estoque"
+  | "impressoras"
   | "vendas"
   | "caixa"
   | "fiscal"
   | "clientes"
   | "sync"
   | "config";
-
 
 type MainSection =
   | "dashboard"
@@ -41,7 +49,13 @@ type MainSection =
   | "stock"
   | "balances"
   | "transfer"
-  | "movements";
+  | "movements"
+  | "printersConfig"
+  | "printersQueue"
+  | "comandasStart"
+  | "comandasOrder"
+  | "comandasList"
+  | "comandasClose";
 
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -566,6 +580,126 @@ export function AxisAdminDashboardPage() {
               </ul>
             </div>
 
+            {/* IMPRESSORAS */}
+            <div
+              className={`axis-nav-group ${
+                isGroupOpen("impressoras") ? "open" : ""
+              }`}
+              data-group="impressoras"
+            >
+              <button
+                className="axis-nav-parent"
+                type="button"
+                onClick={() => toggleGroup("impressoras")}
+              >
+                <div className="axis-nav-parent-main">
+                  <div className="axis-nav-icon">
+                    <PrintersLogoIcon size={16} />
+                  </div>
+                  <span className="axis-nav-parent-label">Impressoras</span>
+                </div>
+                <span className="axis-nav-parent-chevron"></span>
+              </button>
+              <ul className="axis-nav-children">
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("printersConfig");
+                    setOpenGroups((prev) =>
+                      prev.includes("impressoras") ? prev : [...prev, "impressoras"],
+                    );
+                  }}
+                >
+                  <span>Configurar praças e impressoras</span>
+                  <small>Mapear praças e impressoras da loja</small>
+                </li>
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("printersQueue");
+                    setOpenGroups((prev) =>
+                      prev.includes("impressoras") ? prev : [...prev, "impressoras"],
+                    );
+                  }}
+                >
+                  <span>Fila de impressao</span>
+                  <small>Pedidos aguardando impressão</small>
+                </li>
+              </ul>
+            </div>
+
+            {/* COMANDAS */}
+            <div
+              className={`axis-nav-group ${
+                isGroupOpen("comandas") ? "open" : ""
+              }`}
+              data-group="comandas"
+            >
+              <button
+                className="axis-nav-parent"
+                type="button"
+                onClick={() => toggleGroup("comandas")}
+              >
+                <div className="axis-nav-parent-main">
+                  <div className="axis-nav-icon">
+                    <ComandasLogoIcon size={16} />
+                  </div>
+                  <span className="axis-nav-parent-label">Comandas</span>
+                </div>
+                <span className="axis-nav-parent-chevron"></span>
+              </button>
+              <ul className="axis-nav-children">
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("comandasStart");
+                    setOpenGroups((prev) =>
+                      prev.includes("comandas") ? prev : [...prev, "comandas"],
+                    );
+                  }}
+                >
+                  <span>Iniciar</span>
+                  <small>Fluxo de abertura de comandas</small>
+                </li>
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("comandasOrder");
+                    setOpenGroups((prev) =>
+                      prev.includes("comandas") ? prev : [...prev, "comandas"],
+                    );
+                  }}
+                >
+                  <span>Registrar pedido</span>
+                  <small>Adicionar itens na comanda</small>
+                </li>
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("comandasList");
+                    setOpenGroups((prev) =>
+                      prev.includes("comandas") ? prev : [...prev, "comandas"],
+                    );
+                  }}
+                >
+                  <span>Lista de comandas</span>
+                  <small>Comandas em andamento</small>
+                </li>
+                <li
+                  className="axis-nav-child"
+                  onClick={() => {
+                    setMainSection("comandasClose");
+                    setOpenGroups((prev) =>
+                      prev.includes("comandas") ? prev : [...prev, "comandas"],
+                    );
+                  }}
+                >
+                  <span>Finalizar comanda</span>
+                  <small>Encerrar e fechar conta</small>
+                </li>
+              </ul>
+            </div>
+
             {/* CAIXA DE VENDA */}
             <div
               className={`axis-nav-group ${
@@ -693,6 +827,32 @@ export function AxisAdminDashboardPage() {
             <AxisStockTransferPageContent />
           ) : mainSection === "movements" ? (
             <AxisStockMovementsPageContent />
+          ) : mainSection === "printersConfig" ? (
+            <PrintingConfigPage />
+          ) : mainSection === "printersQueue" ? (
+            <section className="axis-panels-grid" style={{ gridTemplateColumns: "1fr" }}>
+              <article className="axis-panel">
+                <div className="axis-panel-header">
+                  <div>
+                    <div className="axis-panel-title">Fila de impressao</div>
+                    <div className="axis-panel-subtitle">
+                      Visualize pedidos pendentes de impressão. (Tela em construção)
+                    </div>
+                  </div>
+                </div>
+                <p style={{ opacity: 0.8 }}>
+                  Em breve você poderá acompanhar e reimprimir pedidos aqui.
+                </p>
+              </article>
+            </section>
+          ) : mainSection === "comandasStart" ? (
+            <ComandasStartPage />
+          ) : mainSection === "comandasOrder" ? (
+            <ComandasOrderPage />
+          ) : mainSection === "comandasList" ? (
+            <ComandasListPage />
+          ) : mainSection === "comandasClose" ? (
+            <ComandasClosePage />
           ) : (
             <>
               <header className="axis-dashboard-header">

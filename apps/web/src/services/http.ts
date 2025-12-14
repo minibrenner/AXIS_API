@@ -90,6 +90,32 @@ apiClient.interceptors.response.use(
       return apiClient(originalRequest);
     }
 
+    // Propaga mensagem amigavel (se a API devolver) sem mudar o objeto original
+    const apiMessage = extractApiMessage(error);
+    if (apiMessage) {
+      error.message = apiMessage;
+      (error as AxiosError & { friendlyMessage?: string }).friendlyMessage = apiMessage;
+    }
+
     return Promise.reject(error);
   },
 );
+
+function extractApiMessage(error: AxiosError): string | null {
+  const payload = error.response?.data as
+    | { message?: string; error?: { message?: string; code?: string } }
+    | undefined;
+
+  if (typeof payload?.message === "string" && payload.message.trim()) {
+    return payload.message.trim();
+  }
+
+  const nested = payload?.error;
+  if (nested && typeof nested.message === "string" && nested.message.trim()) {
+    // Se vier um codigo de erro conhecido, agrega para debug/UX
+    const code = typeof nested.code === "string" && nested.code ? ` (${nested.code})` : "";
+    return `${nested.message.trim()}${code}`;
+  }
+
+  return null;
+}

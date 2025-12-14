@@ -12,8 +12,10 @@ FROM base AS deps
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS builder
-ARG VITE_API_URL=http://localhost:3000
+ARG VITE_API_URL=http://localhost:3000/api
+ARG VITE_ASSETS_BASE_URL=
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_ASSETS_BASE_URL=$VITE_ASSETS_BASE_URL
 COPY . .
 RUN pnpm run build
 

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { config } from "dotenv";
 import { resolve } from "node:path";
 
-function findEnvFile() {
+function findEnvFile(): string | null {
   let directory = __dirname;
   for (let i = 0; i < 6; i++) {
     const candidate = resolve(directory, ".env");
@@ -12,14 +12,15 @@ function findEnvFile() {
     directory = resolve(directory, "..");
   }
   const fallback = resolve(process.cwd(), "../.env");
-  if (existsSync(fallback)) {
-    return fallback;
-  }
-  throw new Error("Não foi possível localizar o arquivo .env.");
+  return existsSync(fallback) ? fallback : null;
 }
 
 const envFilePath = findEnvFile();
-config({ path: envFilePath });
+if (envFilePath) {
+  config({ path: envFilePath });
+} else {
+  console.warn("Arquivo .env nao encontrado; usando variaveis de ambiente existentes.");
+}
 
 function required(name: string): string {
   const value = process.env[name];
@@ -40,6 +41,7 @@ export const env = {
   JWT_REFRESH_TTL: required("JWT_REFRESH_TTL"), // ex.: "7d"
   APP_WEB_URL: optional("APP_WEB_URL", "http://localhost:5173")!,
   CORS_ALLOWED_ORIGINS: optional("CORS_ALLOWED_ORIGINS"),
+  REDIS_URL: optional("REDIS_URL"),
   SMTP_HOST: optional("SMTP_HOST", "smtp.gmail.com")!,
   SMTP_PORT: Number(optional("SMTP_PORT", "587")),
   SMTP_SECURE: optional("SMTP_SECURE", "false") === "true",

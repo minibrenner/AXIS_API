@@ -1,4 +1,5 @@
 import { type Response } from "express";
+import { Prisma } from "@prisma/client";
 
 /**
  * Códigos padronizados de erro retornados pela API.
@@ -23,6 +24,7 @@ export const ErrorCodes = {
   INVALID_CREDENTIALS: "AUTH_INVALID_CREDENTIALS",
   REFRESH_INVALID: "REFRESH_INVALID",
   SESSION_NOT_FOUND: "SESSION_NOT_FOUND",
+  DB_SCHEMA_OUTDATED: "DB_SCHEMA_OUTDATED",
   INTERNAL: "INTERNAL_SERVER_ERROR",
 } as const;
 
@@ -129,6 +131,33 @@ export function buildErrorBody(error: HttpError): ErrorResponseBody {
 export function normalizeError(error: unknown): HttpError {
   if (isHttpError(error)) {
     return error;
+  }
+
+  // Mensagens mais claras para erros comuns do Prisma.
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const msg = error.message || "Erro no banco de dados.";
+    const needsMigration =
+      error.code === "P2021" || // tabela/coluna ausente
+      error.code === "P2022" ||
+      /does not exist in the current database/i.test(msg);
+
+    if (needsMigration) {
+      return new HttpError({
+        status: 500,
+        code: ErrorCodes.DB_SCHEMA_OUTDATED,
+        message: "Banco de dados desatualizado. Rode as migrations e reinicie o serviço.",
+        details: { code: error.code },
+        cause: error,
+      });
+    }
+
+    return new HttpError({
+      status: 400,
+      code: ErrorCodes.BAD_REQUEST,
+      message: msg,
+      details: { code: error.code },
+      cause: error,
+    });
   }
 
   if (error instanceof Error && typeof (error as Partial<HttpError>).status === "number") {

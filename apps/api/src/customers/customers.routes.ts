@@ -11,7 +11,7 @@ export const customersRouter = Router();
 
 const searchSchema = z.object({ q: z.string().optional(), active: z.coerce.boolean().optional() });
 
-customersRouter.post("/", allowRoles("ADMIN"), withZod(createCustomerSchema), async (req, res) => {
+customersRouter.post("/", allowRoles("ADMIN", "OWNER", "ATTENDANT"), withZod(createCustomerSchema), async (req, res) => {
   const tenantId = req.user!.tenantId;
   const created = await TenantContext.run(tenantId, () => service.create(req.body));
   res.status(201).json(created);
@@ -30,13 +30,13 @@ customersRouter.get("/:id", async (req, res) => {
   res.json(c);
 });
 
-customersRouter.patch("/:id", allowRoles("ADMIN"), withZod(updateCustomerSchema), async (req, res) => {
+customersRouter.patch("/:id", allowRoles("ADMIN", "OWNER", "ATTENDANT"), withZod(updateCustomerSchema), async (req, res) => {
   const tenantId = req.user!.tenantId;
   const up = await TenantContext.run(tenantId, () => service.update(req.params.id, req.body));
   res.json(up);
 });
 
-customersRouter.delete("/:id", allowRoles("ADMIN"), async (req, res) => {
+customersRouter.delete("/:id", allowRoles("ADMIN", "OWNER"), async (req, res) => {
   const tenantId = req.user!.tenantId;
   await TenantContext.run(tenantId, () => service.delete(req.params.id));
   res.status(204).send();

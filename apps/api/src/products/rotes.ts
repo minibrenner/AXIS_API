@@ -16,17 +16,26 @@ import {
   getProduct,
 } from "./service";
 import { TenantContext } from "../tenancy/tenant.context";
+import { cacheGet, cacheInvalidatePrefix, cacheSet } from "../redis/cache";
 
 export const productsRouter = Router();
+const cachePrefix = (tenantId: string) => `tenant:${tenantId}:products`;
 
 productsRouter.get("/", async (req, res, next) => {
   const tenantId = req.user!.tenantId;
   const q = (req.query.q as string | undefined) ?? undefined;
 
   try {
+    const cacheKey = `${cachePrefix(tenantId)}:list:${q ?? "all"}`;
+    const cached = await cacheGet<unknown[]>(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const products = await TenantContext.run(tenantId, async () =>
       listProducts(tenantId, q),
     );
+    await cacheSet(cacheKey, products, 300);
     res.json(products);
   } catch (err) {
     next(err);
@@ -93,6 +102,7 @@ productsRouter.post(
           return res.status(201).json(updated);
         }
       });
+      await cacheInvalidatePrefix(cachePrefix(tenantId));
     } catch (err) {
       next(err);
     }
@@ -104,10 +114,9 @@ productsRouter.patch(
   uploadSingleImage("image"),
   withZod(updateProductSchema),
   async (req, res, next) => {
+    const tenantId = req.user!.tenantId;
+    const id = req.params.id;
     try {
-      const tenantId = req.user!.tenantId;
-      const id = req.params.id;
-
       await TenantContext.run(tenantId, async () => {
         const existing = await getProduct(tenantId, id);
 
@@ -146,6 +155,8 @@ productsRouter.patch(
     } catch (err) {
       next(err);
     }
+
+    await cacheInvalidatePrefix(cachePrefix(tenantId));
   },
 );
 
@@ -173,6 +184,7 @@ productsRouter.patch("/:id/active", async (req, res, next) => {
 
       res.json(updated);
     });
+    await cacheInvalidatePrefix(cachePrefix(tenantId));
   } catch (err) {
     next(err);
   }
@@ -199,6 +211,7 @@ productsRouter.delete("/:id", async (req, res, next) => {
 
       res.status(204).end();
     });
+    await cacheInvalidatePrefix(cachePrefix(tenantId));
   } catch (err) {
     next(err);
   }

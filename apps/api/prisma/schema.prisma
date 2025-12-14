@@ -14,6 +14,22 @@ enum Role {
   OWNER
 }
 
+enum ComandaStatus {
+  ABERTO
+  PENDENTE
+  ENCERRADO
+}
+
+enum ComandaCustomerStatus {
+  ATIVO
+  DESATIVADO
+}
+
+enum CustomerComandaStatus {
+  ATIVO
+  DESATIVADO
+}
+
 model Tenant {
   id          String     @id @default(cuid())
   name        String     @unique
@@ -34,6 +50,10 @@ model Tenant {
   categories Category[] // FIX: back-relation obrigata??rio da relaa??a??o Category.tenant
   customers Customer[]
   customerLedgers CustomerLedger[]
+  comandas Comanda[]
+  comandaItems ComandaItem[]
+  printerLocations PrinterLocation[]
+  printerDevices   PrinterDevice[]
 
   @@index([isActive, createdAt])
 }
@@ -193,6 +213,9 @@ model Product {
   minStock    Decimal?  @db.Decimal(14, 3)
   isActive    Boolean   @default(true)
   imagePath   String?   // caminho/Key da imagem no storage (Cloudflare R2)
+  comandaItems ComandaItem[]
+  printerLocationId String?
+  printerLocation   PrinterLocation? @relation(fields: [printerLocationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   // Campos fiscais (preparaÃ§Ã£o p/ fases futuras)
   ncm   String?
@@ -211,6 +234,7 @@ model Product {
   @@unique([tenantId, barcode]) // se quiser permitir repetiÃ§Ã£o, remova esta e mantenha apenas @@index
   @@index([tenantId, name])
   @@index([tenantId, barcode])
+  @@index([tenantId, printerLocationId])
 }
 
 model Category {
@@ -359,13 +383,27 @@ enum ProcessedSaleStatus {
 enum PrintJobType {
   SALE_RECEIPT
   CASH_CLOSING
+  ORDER_TICKET
+  TEST_PRINT
 }
 
 enum PrintJobStatus {
   PENDING
-  PRINTING
+  SENDING
   DONE
   FAILED
+}
+
+enum PrinterDeviceType {
+  NETWORK
+  USB
+  WINDOWS
+}
+
+enum PrinterInterface {
+  TCP
+  USB
+  WINDOWS_DRIVER
 }
 
 enum CashApprovalMethod {
@@ -388,6 +426,8 @@ model Sale {
   changeCents    Int             @default(0)
   fiscalMode     String // 'sat' | 'nfce' | 'none'
   fiscalKey      String?
+  receiptPrinterLocationId String?
+  receiptPrinterLocation   PrinterLocation? @relation(fields: [receiptPrinterLocationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   items          SaleItem[]
@@ -506,6 +546,48 @@ model ProcessedSale {
   @@index([tenantId, status])
 }
 
+model PrinterLocation {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  name             String
+  isReceiptDefault Boolean  @default(false) // marca praça padrão para cupons/recibos
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  devices      PrinterDevice[]
+  products     Product[]
+  salesReceipt Sale[]
+  comandas     Comanda[]
+  printJobs    PrintJob[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isReceiptDefault])
+}
+
+model PrinterDevice {
+  id          String             @id @default(cuid())
+  tenantId    String
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  name        String
+  type        PrinterDeviceType  // ex.: NETWORK, USB, WINDOWS
+  interface   PrinterInterface   // ex.: TCP, USB, WINDOWS_DRIVER
+  host        String?
+  port        Int?
+  locationId  String?
+  location    PrinterLocation?   @relation(fields: [locationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  isActive    Boolean            @default(true)
+  lastSeenAt  DateTime?
+  workstationId String? // identificador da estação/caixa (ex.: caixa1-asus)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  printJobs   PrintJob[]
+
+  @@index([tenantId, locationId])
+  @@index([tenantId, isActive])
+  @@index([tenantId, workstationId])
+}
+
 model PrintJob {
   id            String         @id @default(cuid())
   tenantId      String
@@ -523,11 +605,19 @@ model PrintJob {
   processedAt   DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  locationId     String?
+  printerDeviceId String?
+  idempotencyKey String?       @unique
+  retries        Int           @default(0) // tentativas de envio/reenfileiramento
+  errorMessage   String?
 
-  cashSession CashSession? @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
-  sale        Sale?        @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  cashSession CashSession?  @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  sale        Sale?         @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  location    PrinterLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  printerDevice PrinterDevice? @relation(fields: [printerDeviceId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([tenantId, status, type])
+  @@index([tenantId, locationId])
 }
 
 
@@ -544,6 +634,7 @@ model Customer {
   creditLimit    Decimal? @db.Decimal(12,2) // pode ser null = sem limite
   defaultDueDays Int?
   isActive       Boolean  @default(true)
+  comandaStatus  CustomerComandaStatus @default(ATIVO)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -578,4 +669,51 @@ model CustomerLedger {
 
   @@index([tenantId, customerId, type, dueDate])
   @@index([tenantId, createdAt])
+}
+
+model Comanda {
+  id             String                 @id @default(cuid())
+  tenantId       String
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  number         String
+  customerName   String?
+  customerPhone  String?
+  customerCpf    String?
+  customerStatus ComandaCustomerStatus  @default(ATIVO)
+  status         ComandaStatus          @default(ABERTO)
+  notes          String?
+  tableNumber    String?
+  receiptPrinterLocationId String?
+  receiptPrinterLocation   PrinterLocation? @relation(fields: [receiptPrinterLocationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  openedAt       DateTime               @default(now())
+  closedAt       DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  items          ComandaItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, customerStatus])
+  @@index([tenantId, receiptPrinterLocationId])
+}
+
+model ComandaItem {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  comandaId    String
+  comanda      Comanda  @relation(fields: [comandaId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  quantity     Decimal  @db.Decimal(12, 3)
+  unitPrice    Decimal  @db.Decimal(10, 2)
+  totalPrice   Decimal  @db.Decimal(12, 2)
+  tableNumber  String?
+  notes        String?
+  createdByUserId   String?
+  createdByUserName String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, comandaId])
+  @@index([tenantId, productId])
 }

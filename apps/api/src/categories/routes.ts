@@ -8,8 +8,10 @@ import {
   processAndUploadImage,
 } from "../utils/imageStorage";
 import { TenantContext } from "../tenancy/tenant.context";
+import { cacheGet, cacheInvalidatePrefix, cacheSet } from "../redis/cache";
 
 export const categoriesRouter = Router();
+const cachePrefix = (tenantId: string) => `tenant:${tenantId}:categories`;
 
 categoriesRouter.post("/", uploadSingleImage("image"), async (req, res, next) => {
   const tenantId = req.user!.tenantId;
@@ -28,11 +30,11 @@ categoriesRouter.post("/", uploadSingleImage("image"), async (req, res, next) =>
       if (req.file) {
         try {
           const imagePath = await processAndUploadImage("category", tenantId, created.id, req.file);
-          const updated = await prisma.category.update({
-            where: { id: created.id },
-            data: { imagePath },
-          });
-          res.status(201).json(updated);
+        const updated = await prisma.category.update({
+          where: { id: created.id },
+          data: { imagePath },
+        });
+        res.status(201).json(updated);
         } catch (err) {
           await prisma.category.delete({ where: { id: created.id } });
           throw err;
@@ -46,6 +48,8 @@ categoriesRouter.post("/", uploadSingleImage("image"), async (req, res, next) =>
         });
         res.status(201).json(updated);
       }
+
+      await cacheInvalidatePrefix(cachePrefix(tenantId));
     });
   } catch (err) {
     next(err);
@@ -56,12 +60,20 @@ categoriesRouter.get("/", async (req, res, next) => {
   const tenantId = req.user!.tenantId;
 
   try {
+    const cacheKey = `${cachePrefix(tenantId)}:list`;
+    const cached = await cacheGet<unknown[]>(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const list = await TenantContext.run(tenantId, async () =>
       prisma.category.findMany({
         where: { tenantId },
         orderBy: { name: "asc" },
       }),
     );
+
+    await cacheSet(cacheKey, list, 300);
 
     res.json(list);
   } catch (err) {
@@ -103,6 +115,7 @@ categoriesRouter.put("/:id", uploadSingleImage("image"), async (req, res, next) 
       }
 
       res.json(updated);
+      await cacheInvalidatePrefix(cachePrefix(tenantId));
     });
   } catch (err) {
     next(err);
@@ -133,9 +146,9 @@ categoriesRouter.delete("/:id", async (req, res, next) => {
       }
 
       res.status(204).end();
+      await cacheInvalidatePrefix(cachePrefix(tenantId));
     });
   } catch (err) {
     next(err);
   }
 });
-

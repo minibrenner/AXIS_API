@@ -15,10 +15,14 @@ export async function login(email: string, password: string) {
     }
     return { access: res.data.access };
   } catch (error) {
-    const err = error as { response?: { data?: { message?: string } } };
+    const err = error as ApiError;
+    const status = err.response?.status;
+    if (status === 401 || status === 400) {
+      throw new Error("Senha ou e-mail incorretos");
+    }
     const message =
       err.response?.data?.message ??
-      "Nǜo foi poss��vel alcan��ar a API de autentica��ǜo. Verifique se o backend e o CORS estǜo configurados.";
+      "Nao foi possivel alcancar a API de autenticacao. Verifique sua conexao ou o backend.";
     throw new Error(message);
   }
 }
@@ -531,6 +535,101 @@ export async function cancelSale(
   }
 }
 
+// ---------- Printing ----------
+export type PrinterDeviceType = "NETWORK" | "USB" | "WINDOWS";
+export type PrinterInterface = "TCP" | "USB" | "WINDOWS_DRIVER";
+export type PrinterLocation = {
+  id: string;
+  name: string;
+  isReceiptDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PrinterDevice = {
+  id: string;
+  name: string;
+  type: PrinterDeviceType;
+  interface: PrinterInterface;
+  host?: string | null;
+  port?: number | null;
+  locationId?: string | null;
+  isActive: boolean;
+  workstationId?: string | null;
+  lastSeenAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listPrinterLocations(): Promise<PrinterLocation[]> {
+  const res = await apiClient.get<PrinterLocation[]>("/printing/locations");
+  return res.data;
+}
+
+export async function createPrinterLocation(payload: {
+  name: string;
+  isReceiptDefault?: boolean;
+}): Promise<PrinterLocation> {
+  const res = await apiClient.post<PrinterLocation>("/printing/locations", payload);
+  return res.data;
+}
+
+export async function updatePrinterLocation(
+  id: string,
+  payload: Partial<{ name: string; isReceiptDefault: boolean }>,
+): Promise<PrinterLocation> {
+  const res = await apiClient.patch<PrinterLocation>(`/printing/locations/${id}`, payload);
+  return res.data;
+}
+
+export async function deletePrinterLocation(id: string, opts?: { force?: boolean }): Promise<void> {
+  await apiClient.delete(`/printing/locations/${id}`, { params: opts });
+}
+
+export async function listPrinterDevices(filters?: {
+  locationId?: string;
+  active?: boolean;
+}): Promise<PrinterDevice[]> {
+  const res = await apiClient.get<PrinterDevice[]>("/printing/devices", { params: filters });
+  return res.data;
+}
+
+export async function createPrinterDevice(payload: {
+  name: string;
+  type: PrinterDeviceType;
+  interface: PrinterInterface;
+  host?: string | null;
+  port?: number | null;
+  locationId?: string | null;
+  isActive?: boolean;
+  workstationId?: string | null;
+}): Promise<PrinterDevice> {
+  const res = await apiClient.post<PrinterDevice>("/printing/devices", payload);
+  return res.data;
+}
+
+export async function updatePrinterDevice(
+  id: string,
+  payload: Partial<{
+    name: string;
+    type: PrinterDeviceType;
+    interface: PrinterInterface;
+    host?: string | null;
+    port?: number | null;
+    locationId?: string | null;
+    isActive?: boolean;
+    workstationId?: string | null;
+  }>,
+): Promise<PrinterDevice> {
+  const res = await apiClient.patch<PrinterDevice>(`/printing/devices/${id}`, payload);
+  return res.data;
+}
+
+export async function testPrinterDevice(id: string) {
+  const res = await apiClient.post(`/printing/devices/${id}/test`);
+  return res.data;
+}
+
 export type SaleReceipt = {
   saleId: string;
   number?: number | null;
@@ -773,4 +872,158 @@ export async function listStockMovements(params?: { productId?: string; location
     },
   });
   return response.data.items ?? [];
+}
+
+export type Customer = {
+  id: string;
+  name: string;
+  document?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  allowCredit?: boolean;
+  creditLimit?: string | null;
+  defaultDueDays?: number | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function searchCustomers(params?: { q?: string; active?: boolean }): Promise<Customer[]> {
+  const response = await apiClient.get<Customer[]>("/customers", {
+    params: {
+      q: params?.q,
+      active: params?.active,
+    },
+  });
+  return response.data;
+}
+
+export async function createCustomer(payload: {
+  name: string;
+  document?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  allowCredit?: boolean;
+  creditLimit?: string;
+  defaultDueDays?: number;
+  isActive?: boolean;
+}): Promise<Customer> {
+  const response = await apiClient.post<Customer>("/customers", payload);
+  return response.data;
+}
+
+export async function updateCustomer(
+  id: string,
+  payload: Partial<{
+    name: string;
+    document?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    allowCredit?: boolean;
+    creditLimit?: string;
+    defaultDueDays?: number;
+    isActive?: boolean;
+  }>,
+): Promise<Customer> {
+  const response = await apiClient.patch<Customer>(`/customers/${id}`, payload);
+  return response.data;
+}
+
+export async function deleteCustomer(id: string): Promise<void> {
+  await apiClient.delete(`/customers/${id}`);
+}
+
+export type ComandaStatus = "ABERTO" | "PENDENTE" | "ENCERRADO";
+export type ComandaCustomerStatus = "ATIVO" | "DESATIVADO";
+
+export type ComandaPayload = {
+  number: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerCpf?: string;
+  status?: ComandaStatus;
+  customerStatus?: ComandaCustomerStatus;
+  notes?: string;
+};
+
+export type Comanda = ComandaPayload & {
+  id: string;
+  tenantId: string;
+  tableNumber?: string | null;
+  openedAt: string;
+  closedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  totalValue?: number;
+  totalItems?: number;
+  items?: Array<{
+    id: string;
+    productId: string;
+    quantity: string | number;
+    unitPrice: string | number;
+    totalPrice: string | number;
+    notes?: string | null;
+    tableNumber?: string | null;
+    createdAt?: string;
+    createdByUserId?: string | null;
+    createdByUserName?: string | null;
+    product?: { id: string; name: string; price?: string | number | null; barcode?: string | null; sku?: string | null };
+  }>;
+};
+
+export async function listComandas(params?: {
+  q?: string;
+  status?: ComandaStatus;
+  customerStatus?: ComandaCustomerStatus;
+}): Promise<Comanda[]> {
+  const response = await apiClient.get<Comanda[]>("/comandas", {
+    params: {
+      q: params?.q,
+      status: params?.status,
+      customerStatus: params?.customerStatus,
+    },
+  });
+  return response.data;
+}
+
+export async function getComanda(id: string): Promise<Comanda> {
+  const response = await apiClient.get<Comanda>(`/comandas/${id}`);
+  return response.data;
+}
+
+export async function createComanda(payload: ComandaPayload): Promise<Comanda> {
+  const response = await apiClient.post<Comanda>("/comandas", payload);
+  return response.data;
+}
+
+export async function updateComanda(
+  id: string,
+  payload: Partial<ComandaPayload>,
+): Promise<Comanda> {
+  const response = await apiClient.patch<Comanda>(`/comandas/${id}`, payload);
+  return response.data;
+}
+
+export async function deleteComanda(id: string): Promise<void> {
+  await apiClient.delete(`/comandas/${id}`);
+}
+
+export type ComandaOrderItemPayload = { productId: string; qty: number };
+
+export async function addItemsToComanda(
+  id: string,
+  payload: {
+    items: ComandaOrderItemPayload[];
+    tableNumber?: string;
+    notes?: string;
+  },
+): Promise<{ comandaId: string; itemsAdded: number; totalValue: string }> {
+  const response = await apiClient.post<{ comandaId: string; itemsAdded: number; totalValue: string }>(
+    `/comandas/${id}/items`,
+    payload,
+  );
+  return response.data;
 }

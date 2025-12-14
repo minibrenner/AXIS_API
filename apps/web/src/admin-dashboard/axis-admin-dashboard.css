@@ -237,7 +237,8 @@ body,
   gap: 0.6rem;
   transition: width 0.25s ease, transform 0.25s ease, padding 0.25s ease,
     background 0.3s ease;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .axis-root.axis-light .axis-sidebar {
   background: linear-gradient(

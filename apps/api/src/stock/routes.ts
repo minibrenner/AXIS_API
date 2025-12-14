@@ -15,6 +15,7 @@ import {
 import { prisma } from "../prisma/client";
 import { ErrorCodes, HttpError } from "../utils/httpErrors";
 import { TenantContext } from "../tenancy/tenant.context";
+import { cacheGet, cacheInvalidatePrefix, cacheSet } from "../redis/cache";
 
 const inSchema = z.object({
   productId: z.string(),
@@ -78,8 +79,9 @@ const deleteInventorySchema = z.object({
 });
 
 export const stockRouter = Router();
+const cachePrefix = (tenantId: string) => `tenant:${tenantId}:stock`;
 
-stockRouter.post("/in", allowRoles("ADMIN"), async (req, res) => {
+stockRouter.post("/in", allowRoles("ADMIN", "OWNER"), async (req, res) => {
   const tenantId = req.tenantId!;
   const body = inSchema.parse(req.body);
 
@@ -88,9 +90,10 @@ stockRouter.post("/in", allowRoles("ADMIN"), async (req, res) => {
   );
 
   res.json({ ok: true, quantity: result.quantity.toString() });
+  await cacheInvalidatePrefix(cachePrefix(tenantId));
 });
 
-stockRouter.post("/out", allowRoles("ADMIN", "ATTENDANT"), async (req, res) => {
+stockRouter.post("/out", allowRoles("ADMIN", "OWNER", "ATTENDANT"), async (req, res) => {
   const tenantId = req.tenantId!;
   const body = outSchema.parse(req.body);
 
@@ -99,9 +102,10 @@ stockRouter.post("/out", allowRoles("ADMIN", "ATTENDANT"), async (req, res) => {
   );
 
   res.json({ ok: true, quantity: result.quantity.toString(), wentNegative: result.wentNegative });
+  await cacheInvalidatePrefix(cachePrefix(tenantId));
 });
 
-stockRouter.post("/adjust", allowRoles("ADMIN"), async (req, res) => {
+stockRouter.post("/adjust", allowRoles("ADMIN", "OWNER"), async (req, res) => {
   const tenantId = req.tenantId!;
   const body = adjSchema.parse(req.body);
 
@@ -110,6 +114,7 @@ stockRouter.post("/adjust", allowRoles("ADMIN"), async (req, res) => {
   );
 
   res.json({ ok: true, quantity: result.quantity.toString(), wentNegative: result.wentNegative });
+  await cacheInvalidatePrefix(cachePrefix(tenantId));
 });
 
 stockRouter.post("/transfer", allowRoles("ADMIN", "OWNER", "ATTENDANT"), async (req, res) => {
@@ -140,6 +145,7 @@ stockRouter.post("/transfer", allowRoles("ADMIN", "OWNER", "ATTENDANT"), async (
       quantity: result.to.quantity.toString(),
     },
   });
+  await cacheInvalidatePrefix(cachePrefix(tenantId));
 });
 
 stockRouter.delete("/inventory", allowRoles("ADMIN", "OWNER"), async (req, res) => {
@@ -161,25 +167,35 @@ stockRouter.delete("/inventory", allowRoles("ADMIN", "OWNER"), async (req, res) 
   }
 
   res.status(204).send();
+  await cacheInvalidatePrefix(cachePrefix(tenantId));
 });
 
-stockRouter.get("/", allowRoles("ADMIN", "ATTENDANT"), async (req, res) => {
+stockRouter.get("/", allowRoles("ADMIN", "OWNER", "ATTENDANT"), async (req, res) => {
   const tenantId = req.tenantId!;
   const query = listQuerySchema.parse(req.query);
+
+  const cacheKey = `${cachePrefix(tenantId)}:list:${query.productId ?? "all"}:${query.locationId ?? "all"}`;
+  const cached = await cacheGet<{ items: unknown[] }>(cacheKey);
+  if (cached) {
+    return res.json(cached);
+  }
 
   const data = await TenantContext.run(tenantId, async () =>
     listStock(tenantId, query.productId, query.locationId),
   );
 
-  res.json({
+  const response = {
     items: data.map((d) => ({
       ...d,
       quantity: d.quantity.toString(),
     })),
-  });
+  };
+
+  await cacheSet(cacheKey, response, 120);
+  res.json(response);
 });
 
-stockRouter.get("/movements", allowRoles("ADMIN"), async (req, res) => {
+stockRouter.get("/movements", allowRoles("ADMIN", "OWNER"), async (req, res) => {
   const tenantId = req.tenantId!;
   const query = listQuerySchema.parse(req.query);
 
@@ -195,7 +211,7 @@ stockRouter.get("/movements", allowRoles("ADMIN"), async (req, res) => {
   });
 });
 
-stockRouter.get("/level", allowRoles("ADMIN", "ATTENDANT"), async (req, res) => {
+stockRouter.get("/level", allowRoles("ADMIN", "OWNER", "ATTENDANT"), async (req, res) => {
   const tenantId = req.tenantId!;
   const query = levelQuerySchema.parse(req.query);
 
@@ -206,7 +222,7 @@ stockRouter.get("/level", allowRoles("ADMIN", "ATTENDANT"), async (req, res) => 
   res.json({ quantity: qty.toString() });
 });
 
-stockRouter.post("/init", allowRoles("ADMIN"), async (req, res) => {
+stockRouter.post("/init", allowRoles("ADMIN", "OWNER"), async (req, res) => {
   const tenantId = req.tenantId!;
   const body = initBodySchema.parse(req.body);
 
@@ -215,9 +231,10 @@ stockRouter.post("/init", allowRoles("ADMIN"), async (req, res) => {
   );
 
   res.status(201).json({ id: row.id, quantity: row.quantity.toString() });
+  await cacheInvalidatePrefix(cachePrefix(tenantId));
 });
 
-stockRouter.post("/init/bulk", allowRoles("ADMIN"), async (req, res) => {
+stockRouter.post("/init/bulk", allowRoles("ADMIN", "OWNER"), async (req, res) => {
   const tenantId = req.tenantId!;
   const body = initBulkBodySchema.parse(req.body);
 
@@ -235,6 +252,7 @@ stockRouter.post("/init/bulk", allowRoles("ADMIN"), async (req, res) => {
       quantity: r.quantity.toString(),
     })),
   });
+  await cacheInvalidatePrefix(cachePrefix(tenantId));
 });
 
 stockRouter.get("/locations", allowRoles("ADMIN", "OWNER", "ATTENDANT"), async (req, res) => {
@@ -261,6 +279,7 @@ stockRouter.post("/locations", allowRoles("ADMIN", "OWNER"), async (req, res) =>
       }),
     );
     res.status(201).json(location);
+    await cacheInvalidatePrefix(cachePrefix(tenantId));
   } catch (error: unknown) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       throw new HttpError({
@@ -300,6 +319,7 @@ stockRouter.put("/locations/:locationId", allowRoles("ADMIN", "OWNER"), async (r
   );
 
   res.json(location);
+  await cacheInvalidatePrefix(cachePrefix(tenantId));
 });
 
 stockRouter.delete("/locations/:locationId", allowRoles("ADMIN", "OWNER"), async (req, res) => {
@@ -339,6 +359,7 @@ stockRouter.delete("/locations/:locationId", allowRoles("ADMIN", "OWNER"), async
   }
 
   res.status(204).send();
+  await cacheInvalidatePrefix(cachePrefix(tenantId));
 });
 
 export default stockRouter;

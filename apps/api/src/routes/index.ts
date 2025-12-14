@@ -16,6 +16,7 @@ import { syncRouter } from "../sync/routes";
 import { customersRouter } from "../customers/customers.routes";
 import { ledgerRouter } from "../customers/ledger.routes";
 import { statementPdfRouter } from "../customers/statement.pdf.routes";
+import { comandasRouter } from "../comandas/routes";
 import { printingRouter } from "../printing/routes";
 
 /**
@@ -54,6 +55,7 @@ const secureRoutes: Array<[string, Router]> = [
   ["/customers", ledgerRouter],
   ["/customers", statementPdfRouter],
   ["/printing", printingRouter],
+  ["/comandas", comandasRouter],
 ];
 
 for (const [prefix, childRouter] of secureRoutes) {

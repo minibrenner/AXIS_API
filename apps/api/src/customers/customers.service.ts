@@ -2,6 +2,7 @@ import { prisma } from "../prisma/client";
 import { TenantContext } from "../tenancy/tenant.context";
 import { ErrorCodes, HttpError } from "../utils/httpErrors";
 import type { CreateCustomerInput, UpdateCustomerInput } from "./dto";
+import { cacheGet, cacheInvalidatePrefix, cacheSet } from "../redis/cache";
 
 type CustomerSearchFilter = {
   q?: string;
@@ -23,18 +24,24 @@ export class CustomersService {
 
   async create(dto: CreateCustomerInput) {
     const tenantId = this.tenantId();
-    return prisma.customer.create({
+    const created = await prisma.customer.create({
       data: {
         tenantId,
         ...dto,
         creditLimit: dto.creditLimit ?? null,
       },
     });
+    await cacheInvalidatePrefix(this.cachePrefix(tenantId));
+    return created;
   }
 
   async list(filters: CustomerSearchFilter = {}) {
     const tenantId = this.tenantId();
-    return prisma.customer.findMany({
+    const cacheKey = `${this.cachePrefix(tenantId)}:list:${filters.q ?? "all"}:${String(filters.active ?? "any")}`;
+    const cached = await cacheGet<unknown[]>(cacheKey);
+    if (cached) return cached as unknown[];
+
+    const data = await prisma.customer.findMany({
       where: {
         tenantId,
         isActive: filters.active ?? undefined,
@@ -48,6 +55,8 @@ export class CustomersService {
       orderBy: { name: "asc" },
       take: 100,
     });
+    await cacheSet(cacheKey, data, 300);
+    return data;
   }
 
   async get(id: string) {
@@ -67,17 +76,25 @@ export class CustomersService {
 
   async update(id: string, dto: UpdateCustomerInput) {
     await this.get(id);
-    return prisma.customer.update({
+    const updated = await prisma.customer.update({
       where: { id },
       data: {
         ...dto,
         creditLimit: dto.creditLimit ?? undefined,
       },
     });
+    await cacheInvalidatePrefix(this.cachePrefix());
+    return updated;
   }
 
   async delete(id: string) {
     await this.get(id);
-    return prisma.customer.delete({ where: { id } });
+    const deleted = await prisma.customer.delete({ where: { id } });
+    await cacheInvalidatePrefix(this.cachePrefix());
+    return deleted;
+  }
+
+  private cachePrefix(tenantId?: string) {
+    return `tenant:${tenantId ?? this.tenantId()}:customers`;
   }
 }
