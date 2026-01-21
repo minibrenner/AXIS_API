@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Comanda, listComandas } from "../../services/api";
+import { type Comanda, listComandas } from "../../services/api";
 
 type Feedback =
   | { kind: "success"; message: string }

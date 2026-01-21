@@ -11,6 +11,8 @@ import {
   testPrinterDevice,
   updatePrinterLocation,
 } from "../../services/api";
+import { PrinterDeviceCard } from "./PrinterDeviceCard";
+import "./printing-config-page.css";
 
 const deviceTypes: { id: PrinterDeviceType; label: string }[] = [
   { id: "NETWORK", label: "Rede" },
@@ -23,15 +25,6 @@ const interfaces: { id: PrinterInterface; label: string }[] = [
   { id: "USB", label: "USB" },
   { id: "WINDOWS_DRIVER", label: "Windows driver" },
 ];
-
-function LabelValue({ label, value }: { label: string; value: string | number | null | undefined }) {
-  return (
-    <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: "0.9rem" }}>
-      <span style={{ opacity: 0.75 }}>{label}:</span>
-      <span style={{ fontWeight: 600 }}>{value ?? "-"}</span>
-    </div>
-  );
-}
 
 export function PrintingConfigPage() {
   const [locations, setLocations] = useState<PrinterLocation[]>([]);
@@ -52,12 +45,25 @@ export function PrintingConfigPage() {
   const [devWorkstation, setDevWorkstation] = useState("");
   const [devActive, setDevActive] = useState(true);
 
-  const locationsWithDevices = useMemo(() => {
-    return locations.map((loc) => ({
-      ...loc,
-      devices: devices.filter((d) => d.locationId === loc.id),
-    }));
-  }, [locations, devices]);
+  const devicesWithLocation = useMemo(() => {
+    const locMap = new Map(locations.map((loc) => [loc.id, loc]));
+    const seenLocation = new Set<string>();
+
+    return devices.map((device) => {
+      const location = locMap.get(device.locationId) ?? null;
+      const showReceiptButton = location ? !seenLocation.has(location.id) : false;
+
+      if (location) {
+        seenLocation.add(location.id);
+      }
+
+      return {
+        device,
+        location,
+        showReceiptButton,
+      };
+    });
+  }, [devices, locations]);
 
   const loadData = async () => {
     setLoading(true);
@@ -140,9 +146,9 @@ export function PrintingConfigPage() {
   };
 
   return (
-    <div className="axis-panels-grid" style={{ gridTemplateColumns: "1fr" }}>
+    <div className="axis-panels-grid printing-config-grid">
       <div className="axis-panel">
-        <div className="axis-panel-header" style={{ alignItems: "center" }}>
+        <div className="axis-panel-header">
           <div>
             <div className="axis-panel-title">Configurar pracas e impressoras</div>
             <div className="axis-panel-subtitle">
@@ -155,99 +161,34 @@ export function PrintingConfigPage() {
         </div>
 
         {(error || feedback) && (
-          <div
-            className="axis-alert"
-            style={{
-              background: error ? "rgba(248,113,113,0.12)" : "rgba(34,197,94,0.12)",
-              border: "1px solid rgba(148,163,184,0.35)",
-              padding: "0.65rem 0.8rem",
-              borderRadius: "0.75rem",
-              marginBottom: "0.6rem",
-            }}
-          >
+          <div className={`axis-alert printing-alert ${error ? "printing-alert-error" : "printing-alert-success"}`}>
             {error || feedback}
           </div>
         )}
 
         {loading ? (
-          <div style={{ opacity: 0.8 }}>Carregando...</div>
+          <div className="printing-loading">Carregando...</div>
         ) : (
-          <div className="axis-list" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {locationsWithDevices.map((loc) => (
-              <div
-                key={loc.id}
-                className="axis-list-item"
-                style={{ display: "flex", flexDirection: "column", gap: "0.5rem", border: "1px solid rgba(148,163,184,0.35)" }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ fontWeight: 700 }}>{loc.name}</span>
-                    {loc.isReceiptDefault && (
-                      <span className="axis-tag axis-tag-primary">Recibo</span>
-                    )}
-                  </div>
-                  {!loc.isReceiptDefault && (
-                    <button
-                      type="button"
-                      className="axis-button axis-button-secondary"
-                      onClick={() => void handleSetReceiptDefault(loc.id)}
-                    >
-                      Marcar como recibo
-                    </button>
-                  )}
-                </div>
-
-                {loc.devices.length === 0 ? (
-                  <div style={{ opacity: 0.75 }}>Nenhuma impressora vinculada.</div>
-                ) : (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                      gap: "0.75rem",
-                    }}
-                  >
-                    {loc.devices.map((dev) => (
-                      <div
-                        key={dev.id}
-                        style={{
-                          border: "1px solid rgba(148,163,184,0.3)",
-                          borderRadius: 10,
-                          padding: "0.6rem 0.8rem",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: 12,
-                          alignItems: "center",
-                        }}
-                      >
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            <strong>{dev.name}</strong>
-                            {!dev.isActive && <span className="axis-tag">Inativa</span>}
-                          </div>
-                          <LabelValue label="Tipo" value={`${dev.type} / ${dev.interface}`} />
-                          <LabelValue label="Host" value={dev.host ?? "-"} />
-                          <LabelValue label="Porta" value={dev.port ?? "-"} />
-                          <LabelValue label="Estacao" value={dev.workstationId ?? "-"} />
-                          <LabelValue label="Ultimo contato" value={dev.lastSeenAt ? new Date(dev.lastSeenAt).toLocaleString("pt-BR") : "-"} />
-                        </div>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button
-                            type="button"
-                            className="axis-button axis-button-secondary"
-                            onClick={() => void handleTest(dev.id)}
-                          >
-                            Imprimir teste
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+          <>
+            {devicesWithLocation.length === 0 ? (
+              <div className="printing-empty-state">
+                {locations.length === 0 ? "Nenhuma praca cadastrada." : "Nenhuma impressora cadastrada."}
               </div>
-            ))}
-            {locationsWithDevices.length === 0 && <div style={{ opacity: 0.8 }}>Nenhuma praca cadastrada.</div>}
-          </div>
+            ) : (
+              <div className="printing-cards-grid">
+                {devicesWithLocation.map(({ device, location, showReceiptButton }) => (
+                  <PrinterDeviceCard
+                    key={device.id}
+                    device={device}
+                    location={location}
+                    onTest={(id) => void handleTest(id)}
+                    onMarkReceipt={location && !location.isReceiptDefault ? (locId) => void handleSetReceiptDefault(locId) : undefined}
+                    showReceiptButton={showReceiptButton}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -261,7 +202,7 @@ export function PrintingConfigPage() {
               </div>
             </header>
             <section className="axis-modal-body">
-              <div className="axis-form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+              <div className="axis-form-grid printing-location-grid">
                 <label className="axis-label">
                   Nome da praca
                   <input className="axis-input" value={locName} onChange={(e) => setLocName(e.target.value)} />
@@ -276,8 +217,8 @@ export function PrintingConfigPage() {
                 </label>
               </div>
 
-              <hr style={{ opacity: 0.25, margin: "0.8rem 0" }} />
-              <div className="axis-form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+              <hr className="printing-modal-separator" />
+              <div className="axis-form-grid printing-device-grid">
                 <label className="axis-label">
                   Nome da impressora
                   <input className="axis-input" value={devName} onChange={(e) => setDevName(e.target.value)} />
@@ -330,7 +271,7 @@ export function PrintingConfigPage() {
                     placeholder="caixa1-asus"
                   />
                 </label>
-                <label className="axis-checkbox" style={{ marginTop: "0.2rem" }}>
+                <label className="axis-checkbox printing-checkbox-spaced">
                   <input
                     type="checkbox"
                     checked={devActive}
