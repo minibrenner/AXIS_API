@@ -1,80 +1,50 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Category,
-  Comanda,
-  addItemsToComanda,
-  listCategories,
-  listComandas,
-  listProducts,
-  Product,
-} from "../../services/api";
+import { type Category, type Product, listCategories, listProducts } from "../../services/api";
+import "./comandas-order-page.css";
 
-type Feedback =
-  | { kind: "success"; message: string }
-  | { kind: "error"; message: string }
-  | null;
+type Feedback = { kind: "error"; message: string } | null;
 
-type SelectedItem = {
-  product: Product;
-  qty: number;
-};
+const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 const toNumber = (value?: string | number | null) => {
   if (typeof value === "number") return value;
-  if (typeof value === "string") return Number(value.replace(",", "."));
+  if (typeof value === "string") {
+    const n = Number(value.replace(",", "."));
+    return Number.isFinite(n) ? n : 0;
+  }
   return 0;
 };
 
 export function ComandasOrderPage() {
-  const [searchComanda, setSearchComanda] = useState("");
-  const [tableNumber, setTableNumber] = useState("");
-  const [notes, setNotes] = useState("");
-  const [feedback, setFeedback] = useState<Feedback>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const [comanda, setComanda] = useState<Comanda | null>(null);
-
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [productSearch, setProductSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("__all");
+  const [query, setQuery] = useState<string>("");
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback>(null);
 
-  const [items, setItems] = useState<SelectedItem[]>([]);
+  const categoryOptions = useMemo(
+    () => [{ id: "__all", name: "Todas" }, ...categories],
+    [categories],
+  );
 
-  useEffect(() => {
-    void loadCategories();
-    void loadProducts();
-  }, []);
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    categories.forEach((c) => map.set(c.id, c.name));
+    return map;
+  }, [categories]);
 
-  const loadCategories = async () => {
-    try {
-      const list = await listCategories();
-      setCategories(list);
-    } catch (err) {
-      setFeedback({
-        kind: "error",
-        message: err instanceof Error ? err.message : "Falha ao carregar categorias.",
-      });
-    }
-  };
+  const productMap = useMemo(() => {
+    const map = new Map<string, Product>();
+    products.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [products]);
 
-  const loadProducts = async () => {
-    try {
-      const list = await listProducts();
-      setProducts(list);
-    } catch (err) {
-      setFeedback({
-        kind: "error",
-        message: err instanceof Error ? err.message : "Falha ao carregar produtos.",
-      });
-    }
-  };
-
-  const filteredProducts = useMemo(() => {
-    const term = productSearch.trim().toLowerCase();
+  const visibleProducts = useMemo(() => {
+    const term = query.trim().toLowerCase();
     return products
-      .filter((p) =>
-        selectedCategory ? p.categoryId === selectedCategory : true,
-      )
+      .filter((p) => (selectedCategory === "__all" ? true : p.categoryId === selectedCategory))
       .filter((p) => {
         if (!term) return true;
         return (
@@ -83,380 +53,197 @@ export function ComandasOrderPage() {
           (p.sku ?? "").toLowerCase().includes(term)
         );
       });
-  }, [products, productSearch, selectedCategory]);
+  }, [products, selectedCategory, query]);
 
-  const addItem = (product: Product) => {
-    setItems((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.product.id === product.id ? { ...i, qty: i.qty + 1 } : i,
-        );
+  const totals = useMemo(() => {
+    let totalItems = 0;
+    let totalPrice = 0;
+    for (const [productId, qty] of Object.entries(cart)) {
+      const product = productMap.get(productId);
+      if (!product) continue;
+      const price = toNumber(product.price);
+      totalItems += qty;
+      totalPrice += qty * price;
+    }
+    return { totalItems, totalPrice };
+  }, [cart, productMap]);
+
+  const loadData = async () => {
+    setLoading(true);
+    setFeedback(null);
+    try {
+      const [cats, prods] = await Promise.all([listCategories(), listProducts()]);
+      setCategories(cats);
+      setProducts(prods);
+    } catch (err) {
+      setFeedback({
+        kind: "error",
+        message: err instanceof Error ? err.message : "Falha ao carregar categorias e produtos.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  const addToCart = (productId: string, qty = 1) => {
+    setCart((prev) => {
+      const nextQty = (prev[productId] ?? 0) + qty;
+      const next = { ...prev };
+      if (nextQty <= 0) {
+        delete next[productId];
+      } else {
+        next[productId] = nextQty;
       }
-      return [...prev, { product, qty: 1 }];
+      return next;
     });
   };
 
-  const updateQty = (productId: string, qty: number) => {
-    setItems((prev) =>
-      prev
-        .map((i) =>
-          i.product.id === productId ? { ...i, qty: Math.max(0, qty) } : i,
-        )
-        .filter((i) => i.qty > 0),
-    );
-  };
+  const clearCart = () => setCart({});
 
-  const totalItems = useMemo(
-    () => items.reduce((sum, i) => sum + i.qty, 0),
-    [items],
+  const activeCategory = useMemo(
+    () => categoryOptions.find((c) => c.id === selectedCategory),
+    [categoryOptions, selectedCategory],
   );
-
-  const totalValue = useMemo(
-    () => items.reduce((sum, i) => sum + toNumber(i.product.price) * i.qty, 0),
-    [items],
-  );
-
-  const handleSearchComanda = async () => {
-    if (!searchComanda.trim()) {
-      setFeedback({ kind: "error", message: "Informe numero de comanda, CPF ou celular para buscar." });
-      return;
-    }
-    setIsSearching(true);
-    setFeedback(null);
-    try {
-      const list = await listComandas({ q: searchComanda.trim() });
-      const found = list[0] ?? null;
-      if (!found) {
-        setComanda(null);
-        setFeedback({ kind: "error", message: "Comanda nao encontrada." });
-      } else {
-        setComanda(found);
-        setFeedback(null);
-      }
-    } catch (err) {
-      setFeedback({
-        kind: "error",
-        message: err instanceof Error ? err.message : "Falha ao buscar comanda.",
-      });
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleCancel = () => {
-    const confirm = window.confirm("Cancelar o pedido? Isso limpará todos os itens selecionados.");
-    if (!confirm) return;
-    setItems([]);
-    setTableNumber("");
-    setNotes("");
-    setFeedback(null);
-  };
-
-  const handleSubmit = async () => {
-    if (!comanda || !tableNumber.trim()) {
-      setFeedback({
-        kind: "error",
-        message: "Selecione o numero da comanda e mesa para enviar pedido.",
-      });
-      return;
-    }
-    if (items.length === 0) {
-      setFeedback({ kind: "error", message: "Adicione ao menos um item ao pedido." });
-      return;
-    }
-
-    try {
-      await addItemsToComanda(comanda.id, {
-        items: items.map((i) => ({ productId: i.product.id, qty: i.qty })),
-        tableNumber: tableNumber.trim() || undefined,
-        notes: notes.trim() || undefined,
-      });
-
-      setFeedback({
-        kind: "success",
-        message: `Pedido enviado para a comanda ${comanda.number}.`,
-      });
-      setItems([]);
-      setComanda(null);
-      setSearchComanda("");
-      setTableNumber("");
-      setNotes("");
-      setProductSearch("");
-      setSelectedCategory(null);
-    } catch (err) {
-      setFeedback({
-        kind: "error",
-        message: err instanceof Error ? err.message : "Falha ao enviar o pedido.",
-      });
-    }
-  };
 
   return (
-    <div className="axis-panels-grid" style={{ gridTemplateColumns: "1fr" }}>
-      <div className="axis-panel">
-        <div className="axis-panel-header">
-          <div>
-            <div className="axis-panel-title">Registrar pedido</div>
-            <div className="axis-panel-subtitle">
-              Localize a comanda, selecione itens e finalize o envio.
+    <div className="comandas-shell">
+      <div className="comandas-app">
+        <div className="comandas-topbar">
+          <div className="comandas-title">
+            <div className="comandas-badge">PDV</div>
+            <div>
+              <div style={{ fontSize: 14, lineHeight: 1.05 }}>Registrar pedido</div>
+              <div style={{ fontSize: 12, color: "var(--cmd-muted)", fontWeight: 600 }}>Comandas</div>
             </div>
           </div>
-        </div>
 
-        {feedback && (
-          <div
-            className="axis-alert"
-            style={{
-              background:
-                feedback.kind === "success"
-                  ? "rgba(34,197,94,0.12)"
-                  : "rgba(248,113,113,0.12)",
-              border: "1px solid rgba(148,163,184,0.4)",
-              padding: "0.65rem 0.8rem",
-              borderRadius: "0.75rem",
-              marginBottom: "0.6rem",
-            }}
-          >
-            {feedback.message}
-          </div>
-        )}
-
-        <div className="axis-form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-          <label className="axis-label">
-            Nº Comanda / CPF / Celular
-            <div style={{ display: "flex", gap: "0.4rem" }}>
-              <input
-                className="axis-input"
-                placeholder="Busque por numero, CPF ou celular"
-                value={searchComanda}
-                onChange={(e) => setSearchComanda(e.target.value)}
-              />
-              <button
-                type="button"
-                className="axis-button-secondary"
-                onClick={handleSearchComanda}
-                disabled={isSearching}
-              >
-                {isSearching ? "Buscando..." : "Buscar"}
-              </button>
-            </div>
-          </label>
-
-          <label className="axis-label">
-            Nº Mesa
-            <input
-              className="axis-input"
-              placeholder="Opcional"
-              value={tableNumber}
-              onChange={(e) => setTableNumber(e.target.value)}
-            />
-          </label>
-
-          <label className="axis-label" style={{ gridColumn: "1 / -1" }}>
-            Nome do cliente
-            <input
-              className="axis-input"
-              value={comanda?.customerName ?? ""}
-              placeholder="Preencha ao localizar a comanda"
-              disabled
-            />
-          </label>
-        </div>
-
-        <div style={{ marginTop: "0.6rem" }}>
-          <div
-            style={{
-              display: "flex",
-              gap: "0.5rem",
-              overflowX: "auto",
-              paddingBottom: "0.2rem",
-              scrollbarWidth: "thin",
-            }}
-          >
-            <button
-              type="button"
-              className={`axis-button-secondary${selectedCategory ? "" : " axis-button-secondary-active"}`}
-              onClick={() => setSelectedCategory(null)}
-              style={{ flex: "0 0 auto" }}
-            >
-              Tudo
+          <div className="comandas-actions">
+            <button className="comandas-icon-btn" onClick={() => void loadData()} disabled={loading} title="Recarregar">
+              ⟳
             </button>
-            {categories.map((cat) => (
+            <button className="comandas-icon-btn" onClick={clearCart} title="Limpar carrinho">
+              ⟲
+            </button>
+          </div>
+        </div>
+
+        <div className="comandas-cats-wrap">
+          <div className="comandas-cats">
+            {categoryOptions.map((cat) => (
               <button
                 key={cat.id}
-                type="button"
-                className={`axis-button-secondary${selectedCategory === cat.id ? " axis-button-secondary-active" : ""}`}
-                onClick={() => setSelectedCategory(cat.id)}
-                style={{ flex: "0 0 auto" }}
+                className={`comandas-chip${cat.id === selectedCategory ? " active" : ""}`}
+                onClick={() => {
+                  setSelectedCategory(cat.id);
+                  setQuery("");
+                }}
               >
                 {cat.name}
               </button>
             ))}
           </div>
+        </div>
 
-          <div style={{ marginTop: "0.5rem" }}>
+        <div className="comandas-search-row">
+          <div className="comandas-search" role="search">
+            <span style={{ color: "var(--cmd-muted)" }}>🔎</span>
             <input
-              className="axis-input"
-              placeholder="Buscar produto pelo nome, barcode ou SKU"
-              value={productSearch}
-              onChange={(e) => setProductSearch(e.target.value)}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Pesquisar produtos pelo nome, código de barras ou SKU..."
             />
           </div>
+          <div className="comandas-pill">Categoria: {activeCategory?.name ?? "Todas"}</div>
+          <button className="comandas-icon-btn" onClick={clearCart} title="Limpar carrinho">
+            ✕
+          </button>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gap: "0.5rem",
-            marginTop: "0.8rem",
-            maxHeight: "320px",
-            overflow: "auto",
-          }}
-        >
-          {filteredProducts.slice(0, 4).map((product) => {
-            const price = toNumber(product.price);
-            return (
-              <div
-                key={product.id}
-                className="axis-list-item"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "auto 1fr auto",
-                  gap: "0.5rem",
-                  alignItems: "center",
-                }}
-              >
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: "0.6rem",
-                    background: "rgba(148,163,184,0.25)",
-                    display: "grid",
-                    placeItems: "center",
-                    fontSize: "0.75rem",
-                    color: "rgba(255,255,255,0.8)",
-                  }}
-                >
-                  FOTO
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <strong>{product.name}</strong>
-                  <span style={{ opacity: 0.75 }}>R$ {price.toFixed(2)}</span>
-                </div>
-                <button
-                  type="button"
-                  className="axis-admin-button-primary"
-                  onClick={() => addItem(product)}
-                  style={{ padding: "0.4rem 0.8rem" }}
-                >
-                  Adicionar
-                </button>
-              </div>
-            );
-          })}
-        </div>
+        {feedback && <div className="comandas-status error">{feedback.message}</div>}
 
-        <div
-          style={{
-            marginTop: "1rem",
-            borderRadius: "0.9rem",
-            border: "1px solid rgba(148,163,184,0.35)",
-            padding: "0.8rem",
-            background: "rgba(15,23,42,0.4)",
-          }}
-        >
-          <div style={{ marginBottom: "0.6rem", fontWeight: 600 }}>Pedido</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-            {items.length === 0 && <div style={{ opacity: 0.7 }}>Nenhum item adicionado.</div>}
-            {items.map((item) => {
-              const price = toNumber(item.product.price);
-              return (
-                <div
-                  key={item.product.id}
-                  className="axis-list-item"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "auto 1fr auto",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "0.6rem",
-                      background: "rgba(248,113,113,0.2)",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: "0.7rem",
-                    }}
-                  >
-                    FOTO
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <strong>{item.product.name}</strong>
-                    <span style={{ opacity: 0.75 }}>R$ {price.toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+        <div className="comandas-content">
+          {loading ? (
+            <div className="comandas-loading">Carregando produtos...</div>
+          ) : (
+            <div className="comandas-grid">
+              {visibleProducts.length === 0 && (
+                <div className="comandas-empty">
+                  Nenhum produto encontrado para esta categoria e pesquisa.
+                </div>
+              )}
+
+              {visibleProducts.map((p) => {
+                const qty = cart[p.id] ?? 0;
+                const price = money.format(toNumber(p.price));
+                const categoryLabel = categoryNameById.get(p.categoryId ?? "") ?? "Sem categoria";
+
+                return (
+                  <div key={p.id} className="comandas-card" onClick={() => addToCart(p.id, 1)}>
+                    <div className="comandas-card-thumb" />
+                    <div className="comandas-card-tag">{categoryLabel}</div>
+
                     <button
-                      type="button"
-                      className="axis-button-secondary"
-                      onClick={() => updateQty(item.product.id, item.qty - 1)}
-                      style={{ padding: "0.35rem 0.6rem" }}
-                    >
-                      -
-                    </button>
-                    <span>{item.qty}</span>
-                    <button
-                      type="button"
-                      className="axis-button-secondary"
-                      onClick={() => updateQty(item.product.id, item.qty + 1)}
-                      style={{ padding: "0.35rem 0.6rem" }}
+                      className="comandas-add-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(p.id, 1);
+                      }}
+                      aria-label="Adicionar"
+                      title="Adicionar"
                     >
                       +
                     </button>
+
+                    <div className="comandas-card-meta">
+                      <div className="comandas-card-name">{p.name}</div>
+                      <div className="comandas-card-price-row">
+                        <div className="comandas-card-price">{price}</div>
+                        <div className="comandas-card-qty">
+                          {qty > 0 ? `No carrinho: ${qty}` : "—"}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          )}
+
+          <div className="comandas-hint">
+            Dica: clique em um card para adicionar 1 item. Clique no “+” para adicionar também.
           </div>
         </div>
 
-        <label className="axis-label" style={{ marginTop: "0.8rem" }}>
-          Observações
-          <textarea
-            className="axis-input"
-            rows={2}
-            placeholder="Alguma nota para a cozinha ou bar..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </label>
-
-        <div
-          className="axis-form-grid"
-          style={{ gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", marginTop: "0.8rem" }}
-        >
-          <div className="axis-label">
-            Qtd itens:
-            <div style={{ fontWeight: 700 }}>{totalItems}</div>
+        <div className="comandas-bottombar">
+          <div className="comandas-totals">
+            <div className="line1">
+              {totals.totalItems} {totals.totalItems === 1 ? "item" : "itens"}
+            </div>
+            <div className="line2">Total: {money.format(totals.totalPrice)}</div>
           </div>
-          <div className="axis-label">
-            Total do pedido:
-            <div style={{ fontWeight: 700 }}>R$ {totalValue.toFixed(2)}</div>
-          </div>
-        </div>
 
-        <div className="axis-form-actions" style={{ gap: "0.5rem" }}>
-          <button type="button" className="axis-button-secondary" onClick={handleCancel}>
-            Cancelar pedido
-          </button>
-          <button type="button" className="axis-admin-button-primary" onClick={handleSubmit}>
-            Enviar
-          </button>
+          <div className="comandas-bar-actions">
+            <button className="comandas-btn" onClick={clearCart}>
+              Limpar
+            </button>
+            <button
+              className="comandas-btn primary"
+              onClick={() => {
+                if (totals.totalItems === 0) {
+                  setFeedback({ kind: "error", message: "Carrinho vazio. Adicione itens antes de avançar." });
+                  return;
+                }
+                window.alert("Próxima etapa de pagamento/fechamento não implementada nesta tela.");
+              }}
+              disabled={totals.totalItems === 0}
+            >
+              Próximo
+            </button>
+          </div>
         </div>
       </div>
     </div>
